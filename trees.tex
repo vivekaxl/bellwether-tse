@@ -1,0 +1,147 @@
+
+ 
+ Another specific aspect of our design is how we measure model {\em comprehensible}. 
+We assume that software engineers will want to browse and understand and audit the results of any
+ algorithm that has the presumption to tell them to change this our that.
+ One way to present the results of an optimizer is to generate a {\em domination tree}, as fp;;pws"
+ \bi
+ \item
+ Take all the examples
+ ever evaluated by the optimizer; 
+ \item
+ Score each individual  by $|\Omega_I(x)|$, which is the number
+ of other individuals dominated by $x$; 
+ \item
+ Use the CART decision tree learner~\cite{breiman1984classification} to summarize the
+ decisions that lead to difference domiantion scores.
+ \ei
+  In
+ this paper, we will say domination trees with {\em fewest} nodes and leaves
+ are {\em more} comprehensible. 
+ For example, Figures~\ref{fig:dom1} and ~\ref{fig:dom2} show two trees generated from
+ the examples evaluated by FLASH and ePAL while optimizing the SS1 model of 
+ Figure~\ref{fig:unconstrained_case_studies}.
+ Note that one of these trees is far smaller  and hence easier
+ to browse, understand, and audit.
+ 
+  
+ 
+ \begin{figure}[!b]
+ \renewcommand{\baselinestretch{0.65}}
+\hspace{0.2cm}\begin{lstlisting}[
+escapechar=@,
+basicstyle=\scriptsize\ttfamily,
+keepspaces=true,
+linewidth=3.25in,
+frame=none,
+numbers=right]
+@\bh@sccp=0@\eh@
+|    print_used_types=0
+|    |    ipsccp=0 (6.5)
+|    |    ipsccp=1
+|    |    |    x[10]=0 (12) 
+|    |    |    x[10]=1 (19) 
+|    @\bh@print_used_types=1@\eh@
+|    |    ipsccp=0 (14)
+|    |    @\bh@ipsccp=1@\eh@
+|    |    |    time_passes=0  (24)
+|    |    |    @\bh@time_passes=1@\eh@
+|    |    |    |    jump_threading=0 (28)
+|    |    |    |    @\bh@jump_threading=1@\eh@ (31)
+sccp=1
+|    ipsccp=0 (1.5) 
+|    ipsccp=1 (7.5) 
+\end{lstlisting}
+\caption{\small{A domination 
+tree. Optimizer = FLASH; model= SS1, from Figure~\ref{fig:unconstrained_case_studies}.
+Numbers in brackets (e.g. ``(31)'') show how many other individuals are dominated by individuals in a particular leaf.
+For example, on the last line, there is a leaf whose individuals dominate (on average)
+31 others.
+The branch marked in gray leads to the branch with greatest score.
+}}\label{fig:dom1}  
+\end{figure}
+ 
+ \begin{figure}[!b]
+\renewcommand{\baselinestretch{0.65}}
+\hspace{0.2cm}\begin{lstlisting}[
+escapechar=@,
+basicstyle=\scriptsize\ttfamily,
+keepspaces=true,
+linewidth=3.25in,
+frame=none,
+numbers=right]
+ipsccp=0
+|    iv_users=0
+|    |    sccp=0
+|    |    |    print_used_types=0
+|    |    |    |    jump_threading=0
+|    |    |    |    |    time_passes=0
+|    |    |    |    |    |    instcombine=0 (16)
+|    |    |    |    |    |    instcombine=1 (12)
+|    |    |    |    |    time_passes=1
+|    |    |    |    |    |    instcombine=0 (10)
+|    |    |    |    |    |    instcombine=1 (11)
+|    |    |    |    jump_threading=1
+|    |    |    |    |    gvn=0
+|    |    |    |    |    |    inline=0
+|    |    |    |    |    |    |    simplifycfg=0 (22)
+|    |    |    |    |    |    |    simplifycfg=1 (20)
+|    |    |    |    |    |    inline=1 (26)
+|    |    |    |    |    simplifycfg=0 (32)
+|    |    |    |    |    simplifycfg=1 (33)
+|    |    |    print_used_types=1
+|    |    |    |    |inline=0 (47)
+|    |    |    |    |inline=1 (43)
+|    |    sccp=1
+|    |    |    print_used_types=0 (1)
+|    |    |    |print_used_types=1 (7)
+|    iv_users=1
+|    |    sccp=0
+|    |    |    print_used_types=0
+|    |    |    |    jump_threading=0 (30)
+|    |    |    |    jump_threading=1 (42)
+|    |    |    print_used_types=1
+|    |    |    |    inline=0 (56)
+|    |    |    |    inline=1 (62)
+|    |    sccp=1
+|    |    |    instcombine=0 (26)
+|    |    |    instcombine=1 (33)
+@\bh@ipsccp=1@\eh@
+|    @\bh@sccp=0@\eh@
+|    |    print_used_types=0
+|    |    |    iv_users=0
+|    |    |    |    jump_threading=0 (50)
+|    |    |    |    jump_threading=1 
+|    |    |    |    |    instcombine=0 (53)
+|    |    |    |    |    instcombine=1 (54)
+|    |    |    iv_users=1
+|    |    |    |    simplifycfg=0 (59.5)
+|    |    |    |    simplifycfg=1 
+|    |    |    |    |    time_passes=0 (63)
+|    |    |    |    |    time_passes=1 (66)
+|    |    @\bh@print_used_types=1@\eh@
+|    |    |    iv_users=0
+|    |    |    |    time_passes=0 (69)
+|    |    |    |    time_passes=1
+|    |    |    |    |    instcombine=0 (73)
+|    |    |    |    |    instcombine=1 (71)
+|    |    |    @\bh@iv_users=1@\eh@
+|    |    |    |    gvn=0 (76)
+|    |    |    |     @\bh@gvn=1 (79)@\eh@
+|    sccp=1
+|    |    print_used_types=0
+|    |    |    jump_threading=0 (3)
+|    |    |    jump_threading=1 (16)
+|    |    print_used_types=1
+|    |    |    iv_users=0 (35)
+|    |    |    iv_users=1 (50)
+\end{lstlisting}
+\caption{\small{Another domination tree. Same
+format as Figure~\ref{fig:dom1} but the optimizer is ePAL.
+This tree is larger than Figure~\ref{fig:dom1}
+(and hence harder to understand) since ePAL evaluated more examples than FLASH.
+}}\label{fig:dome2}  
+\end{figure}
+ 
+ 
+ 

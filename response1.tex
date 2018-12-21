@@ -1,0 +1,197 @@
+\clearpage
+\section*{Response to Reviewers}
+
+Thank you for your thorough review of the previous version of this article.
+Based on your careful comments, we have made various changes as described below. Please
+advise if we need to make any further changes.
+
+
+\subsection*{Response to Reviewer \#1}
+
+\review{The approach applies existing techniques from the machine learning literature to the problem of configuration optimization. It is not clear whether the authors are introducing a new method; instead, it appears that they are applying a combination of methods from the literature to a software engineering problem. Hence, a sentence like "this article introduces FLASH, a sequential model-based method” can be misleading, as it does not clearly state where the contribution lies.}
+
+Indeed the previous version did not explicitly list out the novelties of \flash. In this version, when we introduce our approach, 
+we take much greater care to  explicitly state the advantages and novelty of various design choices made while developing \flash. \citeresp{1-1}
+
+\review{The authors may argue that the proposed approach is better than existing methods, as shown by the experimental study, hence the contribution is significant. This conclusion, however, is based on a limited set of problems, which are much smaller in size compared to some of the examples from the industry that the authors referenced. This puts into question the generalisability of the results.}
+
+We acknowledge that our examples do not cover the entire space of possible problems. That said, we have been very aware of this issue in all our previous work within this sub-field. We assert that our article experiments  on more data sets that seen in nearly every other article.
+
+\begin{itemize}
+    \item Seigmund et al.~\cite{siegmund2012predicting}: 6
+    \item Guo et al.~\cite{guo2013variability}: 6
+    \item Sarkar et al.~\cite{sarkar2015cost}: 6
+    \item Jamshidi et al.~\cite{jamshidi2016uncertainty}: 15
+    \item Guo et al.’18~\cite{guo2017data}: 10
+    \item Zhu et al.'17~\cite{zhu2017bestconfig}: 5 
+\end{itemize}
+
+
+
+Furthermore, in our work, we have been always pushing to harder and harder models. For example, consider our recent FSE'17~\cite{nair2017using} article on this area. In Figure 1, we introduce a dozen new software systems (over those used in previous articles) and note that many of those are very hard to configure (see the yellow and red entries in that figure).  We then go on to optimize these harder cases.
+
+In this article, we explore all the software systems (explored in our FSE'17 article) and others that are even harder. If you look at Table~\ref{fig:software_systems}, the bottom three examples were deliberately picked to test our methods on higher dimensional configuration problems.  Note that these have not been explored before in this area of research. And, as it turns out, these three defeated the prior state of the art but could be optimized by \flash.
+
+This is not to say that even large problems could defeat \flash---which is your point. And we fully acknowledge that. But we think that this article offers a new high water mark that can motivate subsequent researchers in this field. Finally, there is always the question of how to evaluate the accuracy of an approach when collecting the ground truth is computationally impossible. So, in this light, we believe that the selection of the subject systems are reasonable as they allow us to assess the accuracy in a proofable way.
+
+\review{A side note regarding the problem set: the authors write that the problems are summarized in Figure 1. Perhaps they mean Table 1?}
+
+Thank you for pointing it out. We have fixed it.
+
+\review{The next issue is regarding the term (near) optimal, which is quite vague. I understand that this term is often used in the optimisation literature, and rarely defined. I wonder what is a near optimal solution? How is it different from a sub-optimal solution (also mentioned in the article)? And how can one tell that a solution is (near) optimal, given that the search space is not exhaustively covered?}
+
+We acknowledge that we used the wrong term. While we can show that X is “sub-optimal” to Y if Y\textquotesingle s performance numbers are better, you are correct that near optimal is harder to define.  Following on from your advice, we have replaced that term globally with ``better''.
+
+\subsection*{Why Not a Single-Objective Utility Function?}
+\review{Finally, the authors introduce a multiobjective version of the problem, but do not provide examples to motivate the approach. Why should one model the problem as a multi objective optimisation problem? In what cases are fitness functions orthogonal and equally important? What is the benefit of using a multiobjective formulation instead of a utility function?}
+
+That is an interesting point that could be explored further. In support of your argument, looking at
+Equation~\ref{eq:mm} we note that it might be said that      BarrySelect {\em does} treat all the objectives as a single objective (technical caveat: due to the random weights assigned to the goals, it is perhaps   more correct to say that BarrySelect treats the problems as {\em multiple} single objective problems).
+
+That said, the goal of this article is not to challenge the base premise of much prior work. Instead, our goal here is to benchmark {\flash} against that prior work. We think you'll agree that what we show here
+is that we can explore configurations better (faster, more scalable, better results) than prior work.
+
+
+
+
+As an aside (and this does not directly address your question), 
+for many years, we did as you suggested; i.e. ran hard-wired single utility functions  e.g. \cite{menzies2007business}. Now, for our work with
+NASA, we keep finding that business users would want to make us re-run the analysis using different thresholds for (e.g. ``too many defects''). After several years of that, we grew tired of that and, instead, turned to technologies that generated a space of solutions.
+
+Also, there is another problem with using utility functions. Consider some hypothetical optimization function that rewards low $a$ and high $b$: \[
+f= a/b
+\]
+Observe how there is a tacit weight ``$W_i$''  in front of each term $a,b$; i.e.  ``$W_i=1$''. Every time we explained this to business users, they would jump to ``what if we adjust this weight, that weight?'' So here again, we were running our utility function multiple times and once again, we grew weary of that and instead, turned to technologies that generated a space of solutions.
+
+More generally, we find that multi-objective reasoning is
+a very useful  requirements exploration tool. By computing the Pareto
+frontier, then clustering it, and showing it to users,
+we can tell them  ``hey, you can\textquotesingle to solve all those  goals you want but here are 4 classes of different products that best satisfy different sets of requirements and which you could market as 4 different products''.
+
+Prominent examples are multi objectives are usually in the area of performance vs. energy consumption, when we want to know the range of configurations that provide different trade-offs between execution time and energy. Other properties are also throughput, coverage criteria, output qualities (e.g., for video encoders), etc., which all could be orthogonal.
+
+
+
+\subsubsection*{Minor Points}
+
+\review{The use of commas in the following sentence is incorrect "Understanding, the configuration space of software sys-tems with large configuration space, is challenging” —> "Understanding the configuration space of software sys-tems with large configuration space is challenging}
+
+Thank you for pointing it out. We have fixed it.
+
+\review{Please include a reference to support the claim "GPMs do not scale well for software systems with more than a dozen configuration options.”}
+
+We have added the reference added as requested~\cite{wang2016bayesian}.
+
+\review{In page 2, second column, line 42,43, please provide reference for "which, at that time, was incorrect by, at least, an order of magnitude.”}
+
+We have added the reference added as requested~\cite{van2017automatic}.
+
+\review{R1-Q9: In page 3, first column, line 48, please consider rephrasing “in the remaining article”, e.g., “throughout the article”.}
+
+Thank you for pointing it out. We haved fixed it.
+
+\review{I am not sure how the footnote in page 4 "2. The probabilistic machine learning model which, unlike fixed point re-gression model, provides the estimated value (mean) along with uncertainty associated with the mean (variance).” helps with the flow of the argument. What is the purpose of comparing probabilistic machine learning models to regression models? Perhaps elaborate your argument. This becomes clearer in the next section, but it is disruptive to the main line of thought at this point.}
+
+You make a good point. We found that if we removed that footnote, the point was made adequately without that elaboration.
+
+\review{In page 4, second column, line 50: Maximum Expected of Improvement is Maximum Expectation of Improvement, or Maximum Expected Improvement}
+
+Thank you for pointing it out. We have fixed it.
+
+\review{In section 4, the authors start by providing a justification why they don’t refer to Oh et al. ’s work (Page 5, first paragraph). This is perhaps not the right place to discuss this. Instead, the authors may consider moving this argument later in the article, after introducing existing methods of performance optimisation of configurable systems. Instead, this paragraph could be used to introduce what will be discussed in this section.}
+
+Thank you for pointing it out. We have moved it to Section 6. \citeresp{1-2}
+
+\review{Please consider rephrasing the following sentence, as it is structured in strange English : "Since it does not build a performance model during search, it cannot be easily adapted (in contrast to the other related work we discuss next) to for multipleobjectives.”}
+
+Thank you for pointing it out. We have fixed it.
+
+\review{It is not clear what the authors mean by: "Even multiple runs using their approach would usually not lead to a set of solutions in the Pareto front, since the independent runs are not aware of each other.”. What does it mean for a run to be aware of another run? And why does this affect the solutions of the Pareto front in the way that is mentioned?}
+
+Thank you for pointing it out. We have revised the sentence. \citeresp{1-2}
+
+
+\review{In page 5, section 4.1, progressive and projective sampling are mention. Please provide a short description of these two methods. The footnote is not informative enough.}
+
+
+Thank you for pointing it out. We have added related text to describe progressive and projective sampling. \citeresp{1-3}
+
+
+\review{In equation (3), you may consider using/extending the terminology introduced in section 3, instead of “predicted” and “actual”. In section 4.2, y and f(x) are used instead. Please consolidate the terminology throughout the article.}
+
+Thank you for the suggestion. We have fixed it.
+
+\review{Using python instead of pseudocode is an interesting approach. However, please make sure that variables are initialised, and the code is executable. For example, in Figure 4, the variable “count" is not initialised.}
+
+Our mistake.
+The variable count is now been initialized on Line 6. We have checked our Python inspired pseudocode again to make sure it is executable.
+
+
+
+
+
+
+
+
+
+\subsection*{Response to Reviewer \#2}
+\review{
+I think the article does a good job of setting the scene up to Section 3. Then Section 4 introduces the first confusion. The way the article is written up to Section 3 leads the reader to believe that FLASH is being compared to GPM based method. And then the reader is presented with description of both residual and rank based heuristics. The third is ePAM, which is adaptation of GPM based method for multi objective problems, using the classical epsillon method. Only in Section 6, it is revealed to the reader that the first two are used in the single objective study (RQ1 and 2), and ePAM in RQ3, 4, and 5.
+}
+
+
+
+
+You are correct. We need to better set up the flow of the article. Now,  the last paragraph of the introduction briefly describes the structure of this article.~\citeresp{2-1}.
+
+After that the article seeks to compare our new methods with respect to the prior state of the art. In the literature, different authors have used different methods to explore single- and multiple-objective problems. For example, 
+the state of the art for single objective optimization has used the “rank-based methods” described in Section 4.2.
+While for multiple objective reasoning, the state-of-the-art uses a novel variant of the Gaussian Process Models explained in detail  in Section 4.3.
+Accordingly, when we compare \flash to prior work, we will use the   single- or  multi-objective problems from prior work. 
+
+The important point to be made here is that, in both single and multi-objective cases, \flash performed as good (or better) as prior work, and did so far less cost (measured in terms of runtimes and number of evaluations).
+ 
+ 
+ \review{Apart from the confusion from lack of connecting narrative (Section 4 begins with an explanation of what is NOT being included in the article, and does not explain why we are going to read about residual/rank/ePAM techniques), I am curious about the different baselines. Why not use a single objective plain GPM for RQ1 and 2 as well? If this was the case, the bit about ePAM can be absorbed into Section 3, and we will have a much nicer flow, not to mention a consistent choice of baseline. I don't think I found a specific reason for this choice in the article.}
+ 
+ We wanted to compare \flash to the current state of the art methods rather than modifying ePAL to fit the single-objective, which was not the actual intention of the authors (of ePAL).
+ 
+ For more on why we elect not to compare FLASH against single objective
+ methods, please see our reply to Reviewer1 
+ {\bf ``Why Not a Single-Objective Utility Function?''}
+ 
+
+\review{CART is simply given as a reference, whereas Barrysort is described by a pseudocode disguising as plain prose.}
+
+You make a good point. We have added more details about CART and BarrySort, which is now renamed as BarrySelect. The  first version of this article we called this algorithm ``BarrySort'' . We now recognize that to be  a mislabel. Barry ``Sort'' does not sort all unlabelled examples; rather it runs over the data to find the most extreme values (which can be done in one-pass, hence O(M) time). To clarify that matter, in  this version of the article we call it \textit{BarrySelect}. \citeresp{2-2}
+
+
+\review{If the acquisition function for FLASH is maximum mean, does it mean that it only exploits and does not explore? Can there be a landscape that is particularly deceptive to FLASH?}
+
+Of course, \flash (like any other optimization technique) would have problems in a landscape which is considerable flat with one (or few) peaks. But note that \flash makes fewer limiting assumptions about the landscape than others. For example, SMBO needs an explicit kernel that transforms the natural rugged landscape into a smooth space---which requires domain knowledge. 
+
+
+\review{The later parts of Section 7.1 may be very challenging for someone without extensive knowledge of statistics, and also feels a bit unnecessarily hand-wavy. I wonder whether the same goal can be achieved using simpler analysis.}
+
+You make a good point. We have added detailed description of Scott-Knott test. \citeresp{2-3}
+
+
+\subsubsection*{Minor Comments}
+
+\review{Based on the description in Section 6.1, I cannot figure out neither how "holdout" and "validation" sets are different (also, why the use of both "set" and "pool"?) nor what their respective roles are.}
+
+You are right. We have add more information for clarity. \citeresp{2-4}
+
+
+\review{The first paragraph of Section 6.3.1 is confusing. I guess "record the performance scores" is the same thing as "added a column showing the performance scores obtained from the actual measurement"? The explicit repetition made me interpret these to be two separate things, which completely confused me.}
+
+Thank you for the suggestion. We have fixed that by removing the confusing
+second part of that sentence
+
+\review{I just want to check that whether it is correct that authors DID exhaustively test ALL configurations. That's what beginnings of 6.3.1 and 6.2.s suggest, right?}
+
+Yes, that is correct.
+
+\review{Section 6.2 states the empirical study considers seven programs: Table 1 lists only six. Also, the text refers to "Figure 1" but it should be Table 1.}
+
+Yes, you are correct and it is a typo. We have corrected it.
