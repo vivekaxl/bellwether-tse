@@ -1,0 +1,25 @@
+\begin{figure}[t]
+\small
+\begin{lstlisting}[xrightmargin=6ex, mathescape,frame=none,numbers=right]
+def GPTransform(source, target, 
+                 source_budget, target_budget): 
+  "Sample random configurations"
+  s_some = source.sample(source_budget)
+  t_some = target.sample(target_budget)
+  "Get performance measurements"
+  s_perf = get_perf(s_some)
+  t_perf=get_perf(t_some)
+  "Compute correlation"
+  perf_correlation = get_correlation(s_perf, t_perf)
+  "Compute covariance"
+  input_covariance = get_covariance(s_some, t_some)
+  "Construct a kernel"
+  kernel = input_covariance $\times$ perf_correlation
+  "Train the Gaussian Process model"
+  learner = GaussianProcessRegressor(kernel)
+  prediction_model = learner.train(s_some)
+  return prediction_model
+\end{lstlisting}
+\caption{\small{Gaussian Process Transformation Transfer. From   Jamshidi et al.~\cite{jamshidi2017transfer}.}}
+\label{fig:gptransform}  
+\end{figure}

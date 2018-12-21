@@ -1,0 +1,23 @@
+\begin{table*}[t]
+\caption{{\small Overview of the real-world subject systems. $|C|$:Number of Configurations, $|c|$=Number of configuration options, $|E|$: Number of Environments, $|H|$: Hardware, $|W|$: Workloads, and $|V|$: Versions. See \protect\url{http://tiny.cc/bw_software} for more details.}}
+\label{tab:datasets}
+\scriptsize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lp{1cm}p{1.6cm}p{2cm}p{2.3cm}p{0.5cm}p{1.2cm}p{3.5cm}@{}}
+\toprule
+\textbf{System} & \textbf{Language} & \textbf{\{$|C|$, $N$, $|E|$\}} & \multicolumn{1}{c}{\textbf{$H$}} & \multicolumn{1}{c}{\textbf{$W$}} & \multicolumn{1}{c}{\textbf{$V$}} & \multicolumn{1}{c}{\textbf{Unchanged}} & \textbf{Description} \\ \midrule
+
+\rowcolor[HTML]{EFEFEF}
+x264 & C, Assembly & 4000, 16, 21 & NUC/4/1.30/15/SSD NUC/2/2.13/7/SSD Station/2/2.8/3/SCSI, AWS/1/2.4/1.0/SSD, AWS/1/2.4/0.5/SSD, Azure/1/2.4/3/SCSI & 8/2, 32/11, 128/44 & r2389, r2744 & Memory, CPU, background services & {\sc x264} is a video encoder that compresses video files and has 16 configurations options to adjust output quality, encoder types, and encoding heuristics. \\
+SPEAR & C, Assembly & 16384, 14, 10 & NUC/4/1.30/15/SSD, NUC/2/2.13/7/SSD, Station/2/2.8/3/SCSI, AWS/1/2.4/1.0/SSD, AWS/1/2.4/0.5/SSD, Azure/1/2.4/3/SCSI & (in \#variables
+ /\#clauses), 774/5934, 1008/7728,, 1554/11914, 978/7498 & 1.2, 2.7 & Memory, CPU, background services & {\sc Spear} is an industrial strength bit-vector arithmetic decision procedure and Boolean satisfiability (SAT) solver. It is designed for proving software verification conditions, and it is used for bug hunting. \\
+\rowcolor[HTML]{EFEFEF}
+SQLite & C & 1000, 14, 15 & NUC/4/1.30/15/SSD, NUC/2/2.13/7/SSD, Station/2/2.8/3/SCSI, AWS/1/2.4/1.0/SSD, AWS/1/2.4/0.5/SSD, Azure/1/2.4/3/SCSI & write--seq, read--batch, , read--rand, read--seq & 3.7. 6.3, 3.19.0.0 & Memory, CPU, background services & {\sc SQLite} is a lightweight relational database management system, embedded in several browsers and operating systems, which has 14 configuration options to change indexing and features for size compression.\\
+SaC & C & 846, 50, 7 & NUC/4/1.30/15/SSD, NUC/2/2.13/7/SSD, Station/2/2.8/3/SCSI, AWS/1/2.4/1.0/SSD, AWS/1/2.4/0.5/SSD, Azure/1/2.4/3/SCSI & random matrix generator,, particle filtering, differential, equation solver, k-means, , optimal matching, nbody , simulation, conjugate , gradient, garbage collector. & 1.0.0 & Memory, CPU, background services & {\sc SaC} is a compiler for high-performance computing. The SaC compiler implements a large number of high-level and low-level optimizations to tune programs for efficient parallel executions. \\
+\rowcolor[HTML]{EFEFEF}
+Storm & Clojure & 2048, 12, 4 & NUC/4/1.30/15/SSD, NUC/2/2.13/7/SSD, Station/2/2.8/3/SCSI, AWS/1/2.4/1.0/SSD, AWS/1/2.4/0.5/SSD, Azure/1/2.4/3/SCSI & WordCount, RollingCount, RollingSort, SOL & Storm 0.9.5 + Zookeeper 3.4.11 & JVM machine, Zookeeper Options, Memory, CPU, background services & {\sc Storm} is a distributed stream processing framework which is used for data analytics. We run three benchmarks and measure the latency of the benchmarks. \\ 
+\bottomrule
+\end{tabular}
+}
+
+\end{table*}

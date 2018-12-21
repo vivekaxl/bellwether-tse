@@ -1,0 +1,20 @@
+\begin{figure}[t]
+\small
+\begin{lstlisting}[xrightmargin=6ex, mathescape,frame=none,numbers=right]
+def LinearTransform(source, target, 
+                    training_coef, budget): 
+  "Construct a prediction model"
+  prediction_model=regTree.train(source, training_coef)
+  "Sample random measurements"
+  s_samp = source.sample(budget)
+  t_samp = target.sample(budget)
+  "Get performance measurements"
+  s_perf=get_perf(s_samp)
+  t_perf=get_perf(t_samp)
+  "Train a transfer model with LR"
+  transfer_model=linear_model.train(s_perf, t_perf)
+  return prediction_model, transfer_model
+\end{lstlisting}
+\caption{\small{Linear Transformation Transfer. From Valov et al.~\cite{valov2017transferring}.}}
+\label{fig:lineartransform}  
+\end{figure}
