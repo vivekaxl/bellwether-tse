@@ -253,41 +253,46 @@ numbers=left
 % Linebreaks \\ can be used within to get better formatting as desired.
 % Do not put math or special symbols in the title.
 %\title{Overcoming Limits to \\Transfer Learning in Defect Prediction}
-\title{Finding Faster Configurations using {\sc FLASH}}
+\title{Whence to Learn?
+Transferring Knowledge\\ in Configurable Systems using BEETLE}
 
 \author{Vivek Nair,~%~\IEEEmembership{Member,~IEEE,}
-        Zhe Yu,~%~\IEEEmembership{Member,~IEEE,}
+        Rahul Krishna,~%~\IEEEmembership{Member,~IEEE,}
         Tim Menzies,~%~\IEEEmembership{Member,~IEEE,}
-        Norbert Siegmund,~%~\IEEEmembership{Member,~IEEE},
-        and Sven Apel%~\IEEEmembership{Member,~IEEE}
-\IEEEcompsocitemizethanks{\IEEEcompsocthanksitem V. Nair, Z. Yu and T. Menzies are with the Department
+        and Pooyan Jamshidi%~\IEEEmembership{Member,~IEEE}
+\IEEEcompsocitemizethanks{\IEEEcompsocthanksitem V. Nair, R. Krishna and T. Menzies are with the Department
 of Computer Science, North Carolina State University, Raleigh, USA.\protect\\
-E-mail: \{vivekaxl, azhe9 and tim.menzies\}@gmail.com
-\IEEEcompsocthanksitem N. Siegmund is with the Department of Computer Science and Engineering, Bauhaus-University Weimar, Germany.\protect\\
-E-mail: norbert.siegmund@uni-weimar.de
-\IEEEcompsocthanksitem S. Apel is with the Department of Informatics and Mathematics,
-University of Passau, Innstr. 33, 94032 Passau, Germany.\protect\\
-E-mail:apel@uni-passau.de}% <-this % stops an unwanted space
-\thanks{Manuscript received November XX, 2017.}}
+E-mail: \{vivekaxl, i.m.ralk and tim.menzies\}@gmail.com
+\IEEEcompsocthanksitem P. Jamshidi is with the Department of Computer Science and Engineering, Univesity of South Carolina, USA.\protect\\
+E-mail: pooyan.jamshidi@gmail.com}% <-this % stops an unwanted space
+\thanks{Manuscript received December XX, 2018.}}
 
 
 % The paper headers
- \markboth{IEEE TRANS SE. submitted Nov`17}%
+ \markboth{IEEE TRANS SE. submitted Dec`18}%
 {Shell \MakeLowercase{\textit{et al.}}: Bare Demo of IEEEtran.cls for Computer Society Journals}
 
 
 \IEEEtitleabstractindextext{%
 \begin{abstract}
-Finding good configurations of a software system is often challenging since the number of configuration options can be large.
-Software engineers often make poor choices about configuration or, even worse, they usually use a sub-optimal configuration in production, which leads to inadequate performance. To assist engineers in finding the better configuration, this article introduces   \flash, a sequential model-based method that sequentially explores the configuration space by reflecting on the configurations evaluated so far to determine the next best configuration to explore.
-\flash scales up to software systems that defeat the prior state-of-the-art model-based methods in this area. \flash runs much faster than existing methods and can solve both single-objective and multi-objective optimization problems. The central insight of this article is to use the prior knowledge of the configuration space (gained from prior runs) to choose the next promising configuration. This strategy reduces the effort (i.e., number of measurements) required to find the better configuration. 
-% \flash can be used to solve single-objective (e.g., run-time) and can also be adapted to multi-objective (e.g., energy and runtime) performance optimization problems. 
-We evaluate \flash  using 30 scenarios based on 7 software systems to demonstrate that \flash saves effort in 100\% and 80\% of cases in single-objective and multi-objective problems respectively by up to several orders of magnitude compared to state-of-the-art techniques. 
+As software systems grow in complexity and the space of possible configurations increases exponentially, finding the near-optimally performing configuration of a software system becomes challenging. Recent approaches address this challenge by learning performance models based on a sample set of configurations. However, collecting enough sample configurations can be very expensive since each such sample requires configuring, compiling and executing the entire system using a complex test suite.
+ 
+When learning on new data is too expensive, it is possible to quickly ``transfer'' old
+lessons to the new context.  
+But this gets complicated if there is too much prior data to explore.
+Specifically, (a)~learning from excessive data takes excessive time:
+ (b)~the performance of the models built via transfer can deteriorate as a result of learning from irrelevant information. 
 
+ To resolve these problems, we propose BEETLE, a ``bellwether''-based transfer learner that focuses on just the most useful and relevant subset of the old data. 
+This paper evaluates BEETLE with 61 software configuration problems  based on five software systems
+(a video encoder, an SAT solver, the SQLite database, a high-performance C-compiler, and streaming data analytics tool).
+In each of these cases, BEETLE found configurations that are as good as or better than those found by anything else while requiring only $\frac{1}{7}$th of the measurements needed by prior methods.
+
+Based on these results, we say that BEETLE is a new high-water mark in configuring software systems.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Performance prediction, Search-based SE, Configuration, Multi-objective optimization, Sequential Model-based Methods. 
+Performance Optimization, SBSE, Transfer Learning, Bellwether. 
 \end{IEEEkeywords}}
 
 
@@ -302,1212 +307,726 @@ Performance prediction, Search-based SE, Configuration, Multi-objective optimiza
 \ifCLASSOPTIONcaptionsoff
   \newpage
 \fi
-\section{Introduction}\label{sec:intro}
+ 
 
-\noindent
-Most software systems available today are {\em configurable}; that is, they can be easily adjusted to achieve
-a wide range of functional and  non-functional (e.g., energy or
-performance) properties.  Once a configuration space
-becomes large, it becomes difficult for humans  to keep track of the interactions between the configuration
-options. Section 2 of this article offers more details on many of the problems seen with software configuration. In summary:
-\begin{itemize}[leftmargin=*]
-\item Many software systems have poorly chosen defaults~\cite{van2017automatic,herodotou2011starfish}. Hence, it is useful to seek better configurations.
-\item Understanding the configuration space of software systems with large configuration spaces is challenging~\cite{xu2015hey}.
-\item Exploring more than just a handful of configurations is usually infeasible due to long benchmarking time~\cite{zhu2017optimized}.
-\end{itemize}
-This article describes \flash,  a novel way to find better configurations for a software system (for a given workload). 
-\flash is
-a sequential model-based method (SMBO)~\cite{alipourfard2017cherrypick, snoek2012practical, brochu2010tutorial}
-that reflects
-on the evidence (configurations) retrieved at some point to select the estimated best
-configuration to measure next.
-This way, \flash  uses fewer evaluations to find better configurations compared to more expensive prior work~\cite{guo2013variability, sarkar2015cost, nair17, nair2017using, guo2017data}.
-
-Prior work in this area primarily used two strategies. Firstly, researchers used machine learning to model the configuration space. The model is built sequentially, where new configurations are sampled randomly, and the quality or accuracy of the model is measured using a holdout set. The size of the holdout set in some cases could be up to 20\% of the configuration space~\cite{nair2017using}  and needs to be evaluated (i.e., measured) before even the model is fully built. This strategy makes these methods not suitable in a practical setting since the generated holdout set can be (very) expensive. Secondly, the sequential model-based techniques used in prior work relied on Gaussian Process Models (GPM) to reflect on the configurations explored (or evaluated) so far~\cite{zuluaga2016varepsilon}. However, GPMs do not scale well for software systems with more than a dozen configuration options~\cite{wang2016bayesian}. 
-
-The key idea of \flash is to build a performance model that is just accurate enough for differentiating better configurations from the rest of the configuration space. Tolerating the inaccuracy of the model is useful to reduce the cost (measured in terms of the number of configurations evaluated) and the time required to find the better configuration. To increase the scalability of methods using GPM, \flash replaces the GPMs with a fast and scalable decision tree learner.% that builds one decision tree per objective.
-
-
- \begin{table*}
-\centering
-%\footnotesize
-    % \setlength{\tabcolsep}{4.5pt} % Default value: 6pt
-    \renewcommand{\arraystretch}{1} % Default value: 1
-% \resizebox{1\linewidth}{!}{\begin{tabular}{|p{1.4cm}|p{1.35cm}|p{0.85cm}|p{6.85cm}|p{6.85cm}|c|c|c|}
-\resizebox{\linewidth}{!}{
-    \begin{tabular}{p{1.2cm}p{1.4cm}p{1.65cm}rp{4.85cm}p{6.85cm}crp{0.85cm}}
-\toprule
-\textbf{Family} & \textbf{Software Systems} & \textbf{Objectives} & \textbf{\begin{tabular}[c]{@{}r@{}}\#Config\\ Options\end{tabular}} & \textbf{Configuration Options} & \textbf{Description} & \textbf{Abbr} & \textbf{\begin{tabular}[c]{@{}r@{}}\# Configu-\\ rations\end{tabular}} & \textbf{Prev Used} \\ \midrule
-\multirow{18}{*}{\parbox{1\linewidth}{\vspace{3cm}\textbf{\begin{tabular}[c]{@{}l@{}}Stream\\ Processing \\ Systems\end{tabular}}}} & \multirow{2}{*}{wc-c1-3d} & Throughput & \multirow{2}{*}{3} & \multirow{2}{*}{max spout, spliters, counters} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed by varying 3 configurations of\\ Apache Storm on cluster C1\end{tabular}} & SS-A1 & \multirow{2}{*}{1343} & \multirow{18}{*}{\parbox{1\linewidth}{\vspace{3.7cm}\cite{jamshidi2016uncertainty}}} \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-A2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{wc-c3-3d} & Throughput & \multirow{2}{*}{3} & \multirow{2}{*}{max spout, spliters, counters} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed by varying 3 configurations of\\ Apache Storm on cluster C3\end{tabular}} & SS-C1 & \multirow{2}{*}{1512} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-C2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{wc+wc-c4-3d} & Throughput & \multirow{2}{*}{3} & \multirow{2}{*}{max spout, spliters, counters} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed, collocated with Word Count\\ task, by varying 3 configurations of Apache Storm on\\ cluster C3\end{tabular}} & SS-D1 & \multirow{2}{*}{195} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-D2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{wc-c4-3d} & Throughput & \multirow{2}{*}{3} & \multirow{2}{*}{max spout, spliters, counters} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed by varying 3 configurations of\\ Apache Storm on cluster C4\end{tabular}} & SS-E1 & \multirow{2}{*}{756} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-E2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{wc+rs-c4-3d} & Throughput & \multirow{2}{*}{3} & \multirow{2}{*}{max spout, spliters, counters} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed, collocated with Rolling Sort\\ task, by varying 3 configurations of Apache Storm on\\ cluster C4\end{tabular}} & SS-F1 & \multirow{2}{*}{196} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-F2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{wc+sol-c4-3d} & Throughput & \multirow{2}{*}{3} & \multirow{2}{*}{max spout, spliters, counters} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed, collocated with SOL task, by\\ varying 3 configurations of Apache Storm on cluster\\ C3\end{tabular}} & SS-G1 & \multirow{2}{*}{195} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-G2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{wc-5d-c5} & Throughput & \multirow{2}{*}{5} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}spouts, splitters, counters,buffer-size,\\ heap\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed by varying 5 configurations of\\ Apache Storm on cluster C3\end{tabular}} & SS-I1 & \multirow{2}{*}{1080} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-I2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{rs-6d-c3} & Throughput & \multirow{2}{*}{6} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}spouts, max spout, sorters, emitfreq,\\ chunksize, message size\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Rolling Sort is executed by varying 6 configurations of\\ Apache Storm on cluster C3\end{tabular}} & SS-J1 & \multirow{2}{*}{3839} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-J2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{wc-6d-c1} & Throughput & \multirow{2}{*}{6} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}spouts, max spout, sorters,emitfreq,\\ chunksize,,message size\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Word Count is executed by varying 6 configurations of\\ Apache Storm on cluster C1\end{tabular}} & SS-K1 & \multirow{2}{*}{2880} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Latency &  &  &  & SS-K2 &  &  \\ \midrule
-\multirow{4}{*}{\textbf{FPGA}} & \multirow{2}{*}{sort-256} & Area & \multirow{2}{*}{3} & \multirow{2}{*}{Not specified} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}The design space consists of 206 different hardware\\ implementations of a sorting network for 256 inputs\end{tabular}} & SS-B1 & \multirow{2}{*}{206} & \multirow{6}{*}{\parbox{1\linewidth}{\vspace{1.2cm}\cite{zuluaga2016varepsilon}}} \\ \cmidrule(lr){3-3}
- &  & Throughput &  &  &  & SS-B2 &  &  \\ \cmidrule(lr){2-8}
- & \multirow{2}{*}{noc-CM-log} & Energy & \multirow{2}{*}{4} & \multirow{2}{*}{Not specified} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}The design space consists of 259 different implementations\\of a tree-based network-on-chip,targeting application specific\\circuits (ASICs) and,multi-processor system-on-chip designs\end{tabular}} & SS-H1 & \multirow{2}{*}{259} &  \\ \cmidrule(lr){3-3}
- &  & Runtime &  &  &  & SS-H2 &  &  \\ \cmidrule(r){1-8}
-\multirow{2}{*}{\textbf{Compiler}} & \multirow{2}{*}{llvm} & Performance & \multirow{2}{*}{11} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}time passes, gvn, instcombine,inline,\\ ... , ipsccp, iv users, licm\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}The design space consists of 1023 different compiler settings\\for the LLVM compiler framework. Each setting is specified by\\d = 11 binary flags.\end{tabular}} & SS-L1 & \multirow{2}{*}{1023} &  \\ \cmidrule(lr){3-3} \cmidrule(lr){7-7}
- &  & Memory Footprint &  &  &  & SS-L2 &  &  \\ \midrule
-\multirow{2}{*}{\textbf{\begin{tabular}[c]{@{}l@{}}Mesh\\ Solver\end{tabular}}} & \multirow{2}{*}{Trimesh} & \# Iteration & \multirow{2}{*}{13} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}F, smoother, colorGS,relaxParameter, V, Jac-\\obi, line, zebraLine, cycle, alpha, beta,preSmo-\\othing, postSmoothing\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}Configuration space of Trimesh, a library to\\ manipulate triangle meshes\end{tabular}} & SS-M1 & \multirow{2}{*}{239,260} & \multirow{6}{*}{\parbox{1\linewidth}{\vspace{1.5cm}\cite{siegmund2012predicting}}} \\ \cmidrule(lr){3-3}
- &  & Time to Solutions &  &  &  & SS-M2 &  &  \\ \cmidrule(r){1-8}
-\multirow{2}{*}{\textbf{\begin{tabular}[c]{@{}l@{}}Video\\ Encoder\end{tabular}}} & \multirow{2}{*}{X264-DB} & PSNR & \multirow{2}{*}{17} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}no mbtree, no asm, no cabac, no\\ scenecut,..., keyint, crf, scenecut,\\ seek, ipratio\end{tabular}} & \multirow{2}{*}{Configuration space of X-264 a video encoder} & SS-N1 & \multirow{2}{*}{53,662} &  \\ \cmidrule(lr){3-3}
- &  & Energy &  &  &  & SS-N2 &  &  \\ \cmidrule(r){1-8}
-\multirow{2}{*}{\textbf{\begin{tabular}[c]{@{}l@{}}Seismic\\ Analysis\\ Code\\~~~\end{tabular}}} & \multirow{2}{*}{SaC} & Compile-Exit & \multirow{2}{*}{59} & \multirow{2}{*}{\begin{tabular}[c]{@{}l@{}}extrema, enabledOptimizations,\\ disabledOptimizations,ls, dcr, cf, lir, inl,\\ lur, wlur, ...maxae, initmheap, initwheap\end{tabular}} & \multirow{2}{*}{Configuration space of SaC} & SS-O1 & \multirow{2}{*}{65,424} &  \\ \cmidrule(lr){3-3}
- &  & Compile-Read &  &  &  & SS-O2 &  &  \\ \bottomrule
-\end{tabular}
-}
-\caption{
-Configuration problems explored in this article.   The abbreviations of the systems (Abbr) are sorted in the order of the number of configuration options of the system. The column \#Config Options represent the number of configuration options of the software system and \#Configurations represents the total number of configurations of the system. See \url{http://tiny.cc/flash_systems/} for more details.
-}
-\label{fig:software_systems}
-\end{table*}
-
-
-
-
-
-\noindent The novel contributions of the article are:
-\begin{itemize}[leftmargin=*]
-    \item  We show that \flash can  solve single-objective performance configuration optimization problems using
-    an order of magnitude fewer measurements than the
-    state-of-the-art (Section~\ref{sec:so_results}). This is a critical feature 
-    because, as discussed in Section~\ref{sec:perf_opt}, it can be very slow
-    to sample multiple properties of modern software systems, when each
-    such sample requires (say) to compile and benchmark the corresponding software system.
-    \item We empower \flash to multi-objective performance configuration optimization problems.%, which is not possible with current techniques without building separate performance models.
-    \item We show that \flash   overcomes the shortcomings of prior work and achieves similar performance and scalability, with greatly reduced runtimes (Section~\ref{sec:mo_results}).
-    \item Background material, a replication package, all measurement data, and
-the open-source version of \flash
-are available at supplementary website (\url{http://tiny.cc/flashrepo/}).
-    % \item We also offer a workbench that enables the simple comparisons of tools like \flash with alternatives.
-\end{itemize}
-
-The rest of the article is structured as follows: Section~\ref{sec:perf_opt} motivates this work. Section 3 describes the problem formulation and the theory behind SMBO. Section 4 describes prior work in software performance configuration optimization, followed by the core algorithm of \flash in Section 5. In Section 6, we present our research questions along with experimental settings used to answer them. Prior work in this area addresses a single-objective problem with the only exception of ePAL~\cite{zuluaga2016varepsilon}. Hence, we evaluate \flash separately for single-objective and multi-objective performance configuration optimization problems. In Section 7, we apply \flash on single-objective performance configuration optimization and multi-objective performance configuration optimization. 
-The article ends with a discussion on various aspects of \flash, and finally, we conclude along with a discussion of future work.
-
-
-
-
-
-
-
-
-\section{Performance configuration optimization for Software} \label{sec:perf_opt}
-
- This section  motivates our research by 
- reviewing the numerous problems associated with 
-  software configuration.
-
-Many researchers report that modern software systems come with \textcolor{black}{{\em a daunting number of configuration options}}. 
-For example, the number of configuration options in Apache (a popular web server) increased from 150 to more than 550 configuration options within 16 years~\cite{xu2015hey}. 
-Van Aken et al.~\cite{van2017automatic} also reports a similar trend. They indicate that, in over 15 years, the number of configuration options of {\sc Postgres} and {\sc MySQL} increased by a factor of three and six, respectively.
-This is troubling since
-Xu et al.~\cite{xu2015hey} report that developers tend to ignore over 80\% of configuration options, which leaves considerable optimization potential untapped and induces major economic cost~\cite{xu2015hey}.\footnote{The size of the configuration space increases exponentially  with the number of configuration options.} 
-For illustration, \fig{software_systems} offer examples of the kinds of configuration options seen in software systems. 
-
-
-
-Another problem  with configurable
-systems is the issue of  \textcolor{black}{{\em poorly chosen default configurations}}.
-Often, it is assumed that software architects provide useful default configurations of their systems.  This assumption can be very
-misleading.   Van Aken et al. report that the default MySQL configurations in 2016 assume that it will be installed on a machine that has  160MB of RAM (which, at that
-time, was incorrect by, at least, an order of magnitude)~\cite{van2017automatic}. Herodotou et al.~\cite{herodotou2011starfish} show how standard settings for text mining
-applications in Hadoop result in worst-case execution times.
-In the same vein,  
-Jamshidi et al.~\cite{jamshidi2016uncertainty} reports for
- text mining applications on Apache Storm, the throughput achieved using the worst configuration is 
+\section{Introduction} 
+A problem of increasing concern in modern software is {\em configuration}.
+As more  functionality
+is added to the code, it is becoming increasingly difficult for human users to understand all options of those functions.
+Xu et al.~\cite{xu2015hey} reported at FSE'15  that developers  ignore up 
+to  80\% of configuration options, which exposes
+software teams to many potential problems.
+For example, Van Aken et al. report that the default MySQL configurations in 2016 assume that it will be installed on a machine that has  160MB of RAM (which, at that time, was incorrect by, at least, an order of magnitude)~\cite{van2017automatic}. Also,
+Herodotou et al.~\cite{herodotou2011starfish} show how standard settings for big data analytics in Hadoop result in worst-case execution times. Further, Jamshidi et al.~\cite{JC:MASCOTS16} reports that for
+stream processing applications on Apache Storm, the throughput achieved using the worst configuration was 
 {\em 480 times slower} than the throughput achieved by the best configuration.
 
-Yet another  problem
-is that 
-\textcolor{black}{{\em  exploring benchmark sets for different configurations is very slow}}. 
-Wang et al.~\cite{wang2013searching} comments on the problems of evolving a test suite for software if every candidate solution requires a time-consuming execution of the entire system: such test suite generation can take weeks of execution time.
-Zuluaga et al.~\cite{zuluaga2013active} report on the cost of analysis for software/hardware co-design: ``synthesis of only one design can take hours or even days''. 
+Since configuration is such a pressing problem,
+this paper explores an interesting loophole in the configuration problem. Rather than learning new configurations afresh, we ask if we can adapt existing
+configurations. This is a practical possibility since often when software arrives in a new environment; there are often examples of the same system
+already executing in that \textbf{\textit{environment}}\footnote{We use
+this term {\bf \textit{environment}} as per its precise technical definition from the transfer learning literature. According to
+Jamshidi et al. \cite{jamshidi2017transfer2},
+an ``environment'' refers to the external factors influencing the performance of the system such as workload, hardware, version of the software. For more technical details on this term, see~\tion{formalization}.}. That is, 
+one way to address this problem of configuration and reconfiguration is to learn from the software already running in the new environment. Accordingly, this paper asks ``whence (from where) to learn''; i.e., which of those existing systems could be used to learn good configuration for the software system.
+We show  that a new method called 
+\textbf{BEETLE} (\underline{Be}llw\underline{e}ther \underline{T}ransfer \underline{Le}arner, illustrated in \fig{intro_fig}) can perform that task using just a few samples from the software's working environment.
 
+BEETLE's ability to configure a software system using just a few samples is beneficial. Standard approaches to the automatic configuration are very resource intensive.  A typical approach uses sensitivity analysis~\cite{saltelli2000sensitivity}, where performance models are learned by measuring the performance of the system under a limited number of sampled configurations.
+While this approach is cheaper and more effective than manual exploration,
+it still incurs the expense of extensive data collection about the software ~\cite{guo2013variability, sarkar2015cost, siegmund2012predicting, 
+nair2017faster, nair2017using, nair2018finding, oh2017finding, 
+guo2017data,JC:MASCOTS16}. This is undesirable since this data collection has to be repeated if ever the software is updated
+or the environment of the system changes abruptly. 
  
  
-The challenges of having numerous configuration options are just \textcolor{black}{{\em not limited to software systems}}. The problem to find an good set of configuration options is pervasive and faced in numerous other sub-domains of computer science and beyond. In software engineering, software product lines--where the objective is to find a product which (say) reduces cost and defects~\cite{chen2016sampling, henard2015combining}---have been widely studied.  
-% XXX Interaction testing---how to test configurable systems, when the same test case will behave differently while running under the same set of test cases~\cite{cohen2006testing, qu2007combinatorial, jin2014configurations, medeiros2016comparison}. 
-The problem of configuration optimization is present in domains, such as machine learning, cloud computing, and software security.
+\input{tex/intro_figure.tex}
+
+Due to the shortcomings of  existing methods (expense), much recent work in  automatic
+configuration~\cite{Nam2013, Nam2015, Jing2015, kocaguneli2011find,kocaguneli2012,turhan09,peters15, krishna18} has explored   {\em transfer learning}  for resolving `cold start' problems---problems starting anew for which collecting data is expensive.
+Transfer learning typically entails the transfer of information from a selected
+ software system operating in a ``\textit{source}'' environment to learn a  model for predicting the performance of the system in the 
+``\textit{target}'' environment (i.e. a software system in a different environment).  
+
+Prior work in the area of transfer learning focused on ``\textit{What to transfer}'' and ``\textit{How to transfer}'', by implicitly assuming that the source and target are related to each other. Hence, that work failed to address ``\textit{Where to transfer from}''~\cite{pan2010survey}. While studies have shown when transfer learning works, they do not offer methods for selecting a suitable source~\cite{jamshidi2017transfer2}.
+Note that poor source selection can lead to {\em negative transfer}
+i.e., we learn poor configurations from irrelevant prior knowledge. 
+
+The issue of identifying a suitable source is a common problem in transfer learning. To address this, some researchers~\cite{krishna16,mensah17a, 
+mensah17b, krishna18} have recently proposed the use of the \textit{bellwether} effect, which states that:
+\begin{quote}
+    ``When analyzing a community of software data, then within that community 
+    there exists \underline{at least one} exemplary source, called 
+    \underline{bellwether(s)}, which can best define predictors for other 
+    datasets \ldots''
+\end{quote}
 
 
-The area of \textcolor{black}{{\em hyper-parameter optimization}} (a.k.a.  parameter tuning) is very similar to the performance configuration optimization problem studied in this article. Instead of optimizing the performance of a software system, the hyper-parameter method tries to optimize the performance of a machine learner. Hyper-parameter optimization is an active area of research in various flavors of machine learning. For example, Bergstra and Bengiol~\cite{bergstra2013making} showed how random search could be used for hyper-parameter optimization of high dimensional spaces.
-%Bergstra et a also showed how to tune computer vision software.
-%Feurer el al.~\cite{feurer2015initializing} showed how hyper-parameters could affect the performance of a Bayesian optimizer. 
-Recently, there has been much interest in 
-hyper-parameter optimization applied to the area of software analytics~\cite{fu2016tuning, fufse17, fu2016differential, tantithamthavorn2016automated, agrawal2016wrong}.
+The \textit{bellwether effect} has shown promise in identifying suitable 
+sources for transfer learning in such varied domains as defect prediction, 
+effort estimation, and code smell detection~\cite{krishna18}.
+The significance of bellwethers is that they can be found very easily
+(just a for-loop around wrapped around existing methods). Also, as shown in this paper and
+others~\cite{krishna16,mensah17a,mensah17b, krishna18}, reasoning from the bellwether can lead to superior transfer (as compared to other transfer learning methods).
 
-Another area of application for performance configuration optimization is \textcolor{black}{{\em cloud computing}}.  
-With the advent of big data, long-running analytics jobs are commonplace. Since different analytic jobs have diverse behaviors and resource requirements, choosing the correct virtual machine type
-in a  cloud environment has become critical. This problem has received considerable interest, and we argue, this is another useful application of performance configuration optimization --- that is, optimize the performance of a system while minimizing cost~\cite{alipourfard2017cherrypick, venkataraman2016ernest, yadwadkar2017selecting, Zhu:2017:BTP:3127479.3128605, dalibard2017boat}. 
+This paper is the first to attempt applying bellwethers to configuration problems. 
+From a formal perspective, the BEETLE is similar to a  {\bf racing algorithm}
+that sequentially evaluates candidates and discard poor ones as soon as statistically sufficient evidence is found (this elimination of inferior candidates leads to better conclusions~\cite{birattari2002racing}).
+For more details on how BEETLE implements its racing algorithm, see \tion{beetle}.
+
+This work  makes the  following research contributions: 
+\begin{enumerate}[leftmargin=*]
+\item \textit{Source selection}: We show that the \textit{bellwether effect} exists in performance optimization and that we can use this to discover suitable sources (called bellwether environments) to perform transfer learning. (\S\ref{subsec:rq1})
+\item \textit{Fast source selection algorithm:} We develop a fast algorithm for discovering the bellwether environment by evaluating at-most $\approx10\%$ of the measured configuration space (\S\ref{sect:beetle}).
+\item \textit{Transfer learning using Bellwethers:} We develop a novel transfer 
+learning algorithm using bellwether called BEETLE (short for  
+\underline{Be}llw\underline{e}ther \underline{T}ransfer \underline{Le}arner)
+that uses the bellwether environment to construct a simple transfer learner 
+(\S\ref{sect:beetle}).
+\item \textit{More effective than non-transfer learning: } We show that using the BEETLE is just as good as than non-transfer learning approaches. It is also lot more economical. (\S\ref{sect:rq2}).
+\item \textit{More effective than state-of-the-art methods: } Configurations discovered using the bellwether environment are better than the state-of-the-art 
+methods~\cite{valov2017transferring, jamshidi2017transfer} (\S\ref{subsec:rq4}).
+
+\item \textit{Reproduction Package: } To assist other researchers, a reproduction package with all our scripts and data are available online (see \url{http://tiny.cc/BEETLE}).
+\end{enumerate}
 
 
-As a sideeffect of the wide-spread adoption of cloud computing, the \textcolor{black}{{\em security}} of the instances or virtual machines (VMs) has become a daunting task. In particular, optimized security settings are not identical in every setup. They depend on characteristics of the setup, on the ways an application is used or on other applications running on the same system. The problem of finding security setting for a VM is similar to performance configuration optimization~\cite{biedermann2014hot, biedermann2014leveraging, drabik2003method, security1, security2}. 
-Among numerous other problems which are similar to performance configuration optimization, the problem of how to maximize conversions on landing pages or click-through rates on search-engine result pages~\cite{hill2017efficient, wang2016beyond, zhu2017optimized} has gathered interest.  
-
-
-The rest of this article discusses how \flash addresses configuration problems (using
-the case studies of \fig{software_systems}). 
-% As to the other problems discussed in that section, we leave that those for future work.
-
-\begin{figure*}[!htb]
-    \minipage{0.32\textwidth}
-      \includegraphics[width=\linewidth, height=1in]{Figures/bayesian_1.png}
-    \endminipage\hfill
-    \minipage{0.32\textwidth}
-      \includegraphics[width=\linewidth, height=1in]{Figures/bayesian_2.png}
-    \endminipage\hfill
-    \minipage{0.32\textwidth}%
-      \includegraphics[width=\linewidth, height=1in]{Figures/bayesian_3.png}
-    \endminipage
-\caption{An example of Sequential Model-based method's working process from \cite{brochu2010tutorial}. The figures show a Gaussian process model (GPM) of an objective function over
-four iterations of sampled values.
-Green shaded plots represent acquisition function. The value of the acquisition function is high where the GPM predicts larger objective and where the prediction uncertainty (confidence) is high such points (configurations in our case) is sampled first. Note that the area on the far left is never sampled even when it has high uncertainty (low confidence) associated.} 
-\label{fig:bayesian_optimazation}
-\end{figure*}
-
-\section{Theory}
-The following theoretical notes define the framework used throughout the article.
-
-\subsection{What are Configurable Software Systems?}\label{sec:problem_formal}
-
+\section{Definitions and Problem Statement}
+\label{sect:formalization}
+\noindent This  section offers definitions of concepts
+ used in this paper. 
  
-A configurable software system has a set $X$ of configurations $x \in X$. 
-Let $x_i$ represent the \textit{ith} configuration of a software system. $x_{i,j}$ represent the \textit{jth} configuration option of the configuration $x_i$. In general, $x_{i,j}$ indicates either an (i) integer variable or a (ii) Boolean variable. The configuration space ($X$) represents all the valid configurations of a software system. The configurations are also referred to as \textit{independent variables}.
-Each configuration ($x_i$), where $1\le i\le |X|$, has one (single-objective) or many (multi-objective) corresponding performance measures $y_{i,k} \in Y$, where $y_{i,k}$  indicates the $1\le kth\le m$ objective  associated with a configuration $x_i$. The performance measure is also referred to as \textit{dependent variable}. For multi-objective problems, there are multiple dependent variables. 
-We denote the performance measures ($y\in Y$) associated with a given configuration by $(y_{i,1},..y_{i,m})=f(x_i)$, in multi-objective setting $y_i$ is a vector, where: $f: X\mapsto Y $ is a function which maps $X \in R^n$ to $Y \in R^m$. In a practical setting, whenever we try to obtain the performance measure corresponding to a certain configuration, it requires actually executing a benchmark run with that configuration. In our setting, evaluation of a configuration (or using $f$) is expensive and is referred to as a measurement. The cost or measurement is defined as the number of times $f$ is used to map a configuration $x_i \in X$ to $Y$. In our setting, the cost of an optimization technique is the total number of measurements required to find the better solution.
+\noindent\textbf{Configuration: }A software system, $\mathcal{S}$, may offer a number of configuration options that can be changed. We denote the total number of configuration options of a software system $\mathcal{S}$  as $N$. A configuration option of the software system can either be a (1)~numeric value or a (2)~boolean flag. A configuration is represented by $c^{i}$, where $i$ represents the $i^{th}$ configuration of a system. A set of all configurations is called the \textit{configuration space}, denoted as $\mathcal{C}$.
+  Formally, $\mathcal{C}$ is a Cartesian product of all possible options $\mathcal{C}$ = Dom($c_1$) $\times$ Dom($c_2$) $\times$ ... $\times$ Dom($c_N$), where $\text{Dom}(c_i) = \{0, 1\}$ (in our case) and $N$ is the number of configuration options. 
 
-In the following, we will explore two different kinds of configuration optimization: {\em single-objective}
-and {\em multiple objective}.
-In single-objective performance configuration optimization,
-we consider the problem of finding a good configuration ($x^*$) such that $f(x^*)$ is less than other configurations in $X$. Our objective is to find $x^*$ while minimizing the number of measurements.
-\begin{equation}
-    f(x^*) \le f(x),~~~ \forall x \in {X\setminus x^*}
-\end{equation}
- 
-\noindent That is, our goal is to find the better configuration of a system with least cost or measurements as possible when compared to prior work.
- 
- 
-In multi-objective performance configuration optimization,
-we consider the problem of finding a  configuration ($x^*$) that is better than other configurations in the configuration space of $X$ while minimizing the number of measurements. Unlike, the single-objective configuration optimization problem, where one solution can be the best (optimal) solution (except multiple configurations have the same performance measure), in multi-objective configuration optimization there may be no best solution (best in all objectives). Rather there may be a set of solutions that are equivalent to each other. Hence,
-to declare that one solution is better than another, all objectives must be polled separately. Given two vectors of configurations $x_1,x_2$ with associated objectives $y_{1}, y_{2}$,
-then $x_1$ is binary dominant ($\succ$) over $x_2$ when:
-\begin{equation}\label{eq:bdom}
-    \begin{gathered}
-            y_{1,p} \le y_{2,p} \forall p \in \{1, 2,..., m\}~~\text{and}\\
-            y_{1,q} < y_{2, q}~~\text{for at least one index}~~q \in \{1, 2,...,m\}
-    \end{gathered}
-\end{equation}
-where \textit{$y\in Y$} are the performance measures. We refer to binary dominant configurations as better configurations. For the multi-objective configuration optimization problem, our goal is to find a set of  better configurations of a given software system using fewer measurements compared to prior work.
-
-% However, the process of finding non-dominated solutions using the non-dominated sort (proposed by Deb at al.~\cite{deb2002fast}) is slow when dealing with a large number of solutions (configuration space in our setting). To overcome the limitation of the non-dominated sort, we use the decomposition method proposed in MOEA/D~\cite{zhang2007moea}. \flash uses a predefined set of \textit{direction vectors} to
-% maintain a diverse set of trade-off solutions. Each solution an associated direction score is calculated. A direction score is the sum of the performance measures weighted against the different direction vectors. The intuition is: a performance measure which can score high in all direction vector has a high likelihood to be a part of the Pareto-optimal solution.
-
-
-
-\subsection{Sequential Model-based Optimization}
-Sequential Model-based Optimization (SMBO) is a useful strategy to find extremes
-of an unknown objective (or performance) function which is expensive (both
-in terms of cost and time) to evaluate. In literature, a certain variant of SMBO is also called \textcolor{black}{Bayesian optimization}. SMBO
-is efficient because of its ability to incorporate prior belief as already measured solutions (or configurations),
-to help direct further sampling. Here, the prior represents
-the already known areas of the search (or performance
-optimization) problem. The prior can be used to estimate the
-rest of the points (or unevaluated configurations). Once we have evaluated one (or many) points based on the
-prior, we can define the posterior. The posterior captures
-our updated belief in the objective function. This step is
-performed by using a machine learning model, also called surrogate model.
-
-
-\noindent The concept of SMBO is simple stated:
-\bi
-\item
-Given what we know about the problem...
-\item
-... what should we do next?
-\ei
-The ``given what we know about the problem'' part is achieved by using a \textit{machine learning model} whereas ``what should we do next'' is performed by an \textit{acquisition function}. Such acquisition function automatically adjusts the exploration (``should we sample in uncertain parts of the search space) and exploitation (``should we stick to what is already known'') behavior of the method. 
-
-This can also be explained as follows. Firstly, few points (or configurations) are (say) randomly selected and measured. These points along with their performance measurements are used to build a model (prior). Secondly, this model is then used to estimate or predict the performance measurements of other unevaluated points (or configurations).%\footnote{The probabilistic machine learning model which, unlike fixed point regression model, provides the estimated value (mean) along with uncertainty associated with the mean (variance).} 
-This can be used by an acquisition function to select the configurations to measure next. This process continues till a predefined stopping criterion (budget) is reached.
-
-Much of the prior  research in configuration optimization of software systems can
-be characterized as an exploration of 
-different acquisition functions.
-These acquisition function (or sampling heuristics) were used to satisfy two requirements: (i) use a `reasonable' number of configurations (along with corresponding measurements) and (ii) the selected configurations should incorporate the relevant interactions---how different configuration options influence the performance measure~\cite{Siegmund2015}.
-In a nutshell, the intuition behind such functions is that it is not necessary to try all configuration options---for pragmatic reasons. Rather, it is only necessary to try a small representative configurations---which incorporates the influences of various configuration options.
-Randomized  functions
- select random items~\cite{guo2013variability, sarkar2015cost}. Other, more intricate,
-acquisition functions first cluster the data then sample only
-a subset of examples within each cluster~\cite{nair17}.
-But the more intricate the acquisition function, the longer it
-takes to execute---particularly for software with very many configurations.  For example,
-recent studies with   a new state-of-the-art acquisition function show that such approaches are limited to models with less than a dozen decisions (i.e. configuration options)~\cite{zuluaga2016varepsilon}.
+\begin{wrapfigure}{r}{1.8in}
+    \scriptsize \centering
+    \resizebox{1\linewidth}{!}{
+\begin{tabular}{l|l|l|l|l }
+                     & \texttt{-f} & \texttt{-i} & \texttt{-u} & \texttt{-v} \\\hline
+$c^1$                & 0                            & 0                            & 0                            & 1                            \\\hline
+$c^2$                & 0                            & 0                            & 1                            & 0                            \\\hline
+\vdots & \vdots         & \vdots         & \vdots         & \vdots         \\\hline
+$c^N$                & 1                            & 1                            & 1                            & 1                           
+\end{tabular}}
+    \caption{Some Unix  configuration options for  \texttt{mv}.}
+    \label{fig:sample_config}
+\end{wrapfigure}
+As a simple example, consider the Unix move program \texttt{mv}, i.e., $\mathcal{S}\equiv\text{\texttt{mv}}$. The \texttt{mv} program offers four configuration options namely, -f (force move), -i    (interactive prompt), -u (update), and -v (verbose), ie., $N=4$. Sample configurations with these options are shown in \fig{sample_config}. %The configuration space $\mathcal{C}$ = Dom($c_1$) $\times$ Dom($c_2$) $\times$ Dom($c_3$) $\times$ Dom($c_N$).
 
 
 
 
-As an example of an acquisition function, consider
-Figure~\ref{fig:bayesian_optimazation}. It illustrates a time series of a typical
- run of SMBO. The bold black line represents the actual performance function ($f$---which is unknown in our setting) and the dotted black line represents the estimated objective function (in the language of SMBO, this is the {\em prior}). 
- The purple regions represent the configuration or uncertainty of estimation in a region---the thicker that region, the higher the uncertainty.
- 
- The green line in that figure represents the acquisition function. The optimization starts with two points (t=2). At each iteration, the acquisition function is maximized to determine where to sample next. The acquisition function is a user-defined strategy, which takes into account the estimated performance measures (mean and variance) associated with each configuration.. The chosen sample (or configuration) maximizes the acquisition function (\textit{argmax}). This process terminates when a predefined stopping condition is reached which is related to the budget associated with the optimization process.
+\noindent\textbf{Environment: }
+As defined by Jamshidi et al. \cite{jamshidi2017transfer2}, 
+the different ways
+a software system
+is deployed and used is called its
+  {\em environment} ($e$). 
+The environment is usually defined in terms of: (1) \textbf{\textit{workload}} ($w$): the input of the system 
+on which it operates on; (2) \textbf{\textit{hardware}} ($h$): the deployment configuration in 
+which the system is running; and (3) \textbf{\textit{version}} ($v$): the state of the 
+software. 
+Note that, other environmental changes might be possible (e.g., JVM version used, etc.). For example, consider software system Apache Storm, here
+we must ensure that an appropriate JVM is installed in an environment before it can be deployed in that environment. Indeed, the selection of one version of 
+a JVM over another can have a profound performance impact. However, the perceived improvement in the performance is due to the optimizations in JVM, not the original software system being studied.  Therefore, in this paper, we do not alter the environment which does not have a direct impact on the performance of the software system. 
 
-% In the literature, the machine learning (or a surrogate) model used most often are Gaussian Process Models (GPM). 
-Gaussian Process Models (GPM) is often the surrogate model of choice in the machine learning literature.
-GPM is a probabilistic regression model which instead of returning a scalar ($f(x)$) returns the mean and variance associated with $x$. There are various acquisition functions  to choose from: (1) Maximum Mean, (2) Maximum Upper Interval, (3) Maximum Probability of Improvement, (4) Maximum Variance, and (5) Maximum Expected Improvement. 
+\noindent We use the following criteria to select the  environment:
+\be[leftmargin=*]
+    \item Environmental factors of the software systems that we can vary in the deployment stack of the system. This prevents us from varying factors such as JVM version, CPU frequency, system software, etc., which define the deployment stack and not the software system. 
+    \item Common changes developers choose to alter in the software system. In practice, it is these factors that affect the performance of systems the most~\cite{jamshidi2017transfer2, jamshidi2017transfer, valov2017transferring, valov2015}. 
+    \item Factors that are most amenable for transfer learning. Preliminary studies have shown that factors such as workload, hardware, and software version lend themselves very well to transfer learning~\cite{jamshidi2017transfer2, jamshidi2017transfer}.
+\ee
+For a more detailed description of the factors that were changed and those that were unchanged, see Table~\ref{tab:datasets}.
 
-\noindent Building GPMs can be very challenging since:\label{sec:bo_shortcomings}
-\bi[leftmargin=*]
-\item
-GPMs can be very fragile, that is, very sensitive to the parameters of GPMs;
-\item
-GPMs do not scale to  high dimensional data as well as a large dataset (software system with large configuration space)~\cite{shen2006fast}. For example, in SE, the state-of-the-art in this area using GPMs for  optimization was
-limited to models with around ten decisions ~\cite{wang2016bayesian}.
-\ei
+Formally, we say an environment is   $\mathit{\mathbf{e}}=\{w, h, v\}$ where $w \subseteq W$, $h \subseteq H$, and $v \subseteq V$. Here, $W, H, V$ are the space of all possible hardware changes $H$;   all possible software versions $V$, and all possible workload changes  $W$. With this, the environment space is defined as $\mathcal{E}\in\{W\times H\times V\}$, i.e., a subset of environmental conditions $\mathit{\mathbf{e}}$ for various workloads, hardware, and environments.
 
-
-\section{performance optimization of Configurable Software Systems}
-In this section, we discuss the model-based methods used in the prior work to find the better configurations of software systems. \subsection{Residual-based: ``Build an Accurate Model''}\label{sec:residual}
-In this section, we discuss the residual-based method for building performance models for software systems, which, in SMBO terminology, is an optimizer with a \textit{flat acquisition function}, that is, all the points are equally likely to be selected (random sampling). 
-
-When the cost of collecting data (benchmarking time) is higher than the cost of building a performance model (surrogate model), it is imperative to minimize the number of measurements required for model building. A learning curve shows the relationship between the size of the training set and the accuracy of the model. In Figure~\ref{fig:learning_curve}, the horizontal axis represents the number of samples used to create the performance model, whereas the vertical axis represents the accuracy (measured in terms of MMRE---Mean Magnitude of Relative Error) of the model learned. 
-Learning curves typically have a steep sloping portion early in the curve followed by a plateau late in the curve. The plateau occurs when adding data does not improve the accuracy of the model. As engineers, we would like to stop sampling as soon as the learning curve starts to flatten. 
-Two types of residual-based methods have been introduced in Sarkar et al. namely \textit{progressive} and \textit{projective sampling}. \\
-
-(1)~\textit{Progressive Sampling} uses an iterative sampling strategy to inform the process of building the performance model. It starts by sampling a small set of configurations and their corresponding performance measures to build a model and validating the model using a holdout set. Configurations are iteratively sampled and used to construct the performance model until the performance model achieves a specified accuracy (measured in terms of MMRE). The sampling process terminates when a predefined threshold is reached.
-One of the shortcomings of progressive sampling is that the resulting performance model achieves an acceptable accuracy only after a large number of iterations, which implies high modeling cost. There is no way to determine the cost of modeling until the performance model is already built, which defeats its purpose, as there is a risk of over-shooting the modeling budget and still not obtaining an accurate model. \\
-(2)~\textit{Projective sampling} addresses this problem by approximating the learning curve using a minimal set of initial configurations, thus providing the stakeholders with an estimate of the modeling cost.
-
-
-We use progressive sampling as a representative because projective sampling adds only a sample estimation technique to the progressive sampling and does not add anything to the sampling itself.
-
-
-The residual-based method discussed here considers only performance configuration optimization scenarios with a single-objective. In the residual-based method, the correctness of the performance model built is measured using error measures such as MMRE:
-\begin{equation}
-\mathit{MMRE}=\frac{\mid\mathit{f(x)} - \mathit{y}\mid}{\mathit{y}} \cdot 100
-\label{eq:err}
-\end{equation}
-For further details, please refer to Sarkar et. al~\cite{sarkar2015cost}.
-
-\begin{figure}[t]
+\noindent\textbf{Performance: } 
+Each configuration ($c$) of a system $\mathcal{S}$ under an environment $\mathit{\mathbf{e}}$, 
+has a corresponding performance measure $y \in Y_{S,c,e}$ associated with it. 
+We denote the performance 
+measure associated with a given configuration ($c^i$) by $y=f(c^i)$.  We 
+consider the problem of finding the near-optimal configurations ($c^{*}$) such 
+that $f(c^{*})$ is better (less/more) than other configurations in $C_{A,e}$. That is:
+\begin{equation*}
 \centering
-\includegraphics[scale=0.4]{Figures/figure1.eps}
-\caption{{\small The relationship between the accuracy and the number of samples used to train the performance model of the running Word Count application on Apache Storm. Note that the accuracy does not improve substantially after 20 sample configurations.}
-}
-\label{fig:learning_curve}
-\end{figure}
+     {\begin{array}{*{20}{l}}
+     \centering
+{f(c^{*}) \le f(c){\rm{~}}\forall c \in {C_{A,h,w,v}}\setminus c^{*} }&{{\text {for min objective}}}\\
+{f(c^{*}) \ge f(c){\rm{~}}\forall c \in {C_{A,h,w,v}}\setminus c^{*} }&{{\text {for max objective}}}
+\end{array}}
+\end{equation*}
+
+\noindent\textbf{Bellwethers: }
+In the context of performance optimization, the bellwether  effect can be stated as following: \textit{For a configurable system, when performance measurements are made 
+    under 
+    different environments, then
+     among those environments there exists one exemplary environment, called 
+    the bellwether, which can be used determine near optimum configuration for 
+    other environments for that system}.
+We show that, when performing transfer 
+learning, there are exemplar source environments called the bellwether 
+environment(s) ($\mathcal{B}={e_{s1}, e_{s2},...,e_{sn}}\subset E$), which 
+are the best source environment(s) to find near-optimal configuration for the 
+rest of the environments ($\forall e \in E\setminus \mathcal{B}$). 
 
 
+Using the above definitions, we now offer the following  \textbf{Problem Statement} 
+for this paper:\\
 
-
-
-Figure~\ref{fig:progressive_sampling} is a generic algorithm that defines the process of progressive sampling. \emph{Progressive} sampling starts by clearly defining the data used in the training set (called training pool) and used for testing the quality of the surrogate model (in terms of residual-based measures) called \textit{holdout set}. The training pool is the set from which the configurations would be selected (randomly, in this case) and then tested against the holdout set. At each iteration, a (set of) data instance(s) of the training pool is added to the training set (Line 9). Once the data instances are selected from the training pool, they are evaluated, which in our setting means measuring the performance of the selected configuration (Line 12). The configurations and the associated performance scores are used to build the performance model (Line 14). The model is validated using the testing set\footnote{The testing data consist of the configurations as well as the corresponding performance scores.}, then the accuracy is computed. In our setting, we assume that the measure is accuracy (higher is better). Once the accuracy score is calculated, it is compared with the accuracy score obtained before adding the new set of configurations to the training set. If the accuracy of the model (with more data) does not improve the accuracy when compared to the previous iteration (lesser data), then life is lost. This termination criterion is widely used in the field of Evolutionary Algorithms to determine the degree of convergence~\cite{krall2015gale}.
-
-
-\begin{figure}[t]
-\small
-\hspace{0.4cm}\begin{lstlisting}[xleftmargin=5.0ex,mathescape,frame=none,numbers=left]
-  # Progressive Sampling
-  def progressive(training, holdout, lives=3): 
-    # For stopping criterion
-    last_score = -1
-    independent_vals = list()
-    dependent_vals = list()
-    for count in range(1, len(training)):    
-      # Add one configuration to the training set
-      independent_vals += training[count]      
-      # Measure the performance value for the newly
-      # added configuration 
-      dependent_vals += measure(training_set[count])  
-      # Build model
-      model = build_model(independent_vals, dependent_vals)      
-      # Test Model
-      perf_score = test_model(model, holdout, measure(holdout))
-      # If current accuracy score is not better than
-      # the previous accuracy score, then loose life
-      if perf_score <= last_score:
-        lives -= 1
-      last_score = perf_score
-      # If all lives are lost, exit loop
-      if lives == 0: break 
-    return model
-\end{lstlisting}
-\caption{\small{Python code of progressive sampling, a residual-based method.}}
-\label{fig:progressive_sampling}  
-\end{figure}
-
-
-
-\subsection{Rank-based: ``Build a Rank-preserving Model''}
-As an alternative to the residual-based method, a rank-based method has recently been proposed~\cite{nair2017using}. 
-The rank-based method is similar to residual-based method in that it has a \textit{flat acquisition function}, which resembles random sampling. Like the residual-based method, the rank-based method discussed here also considers only performance configuration optimizations with a single-objective. For further details, please refer to Nair et. al~\cite{nair2017using}.
-
-\begin{figure}[t]
-\small
-\hspace{0.4cm}\begin{lstlisting}[xleftmargin=5.0ex,mathescape,frame=none,numbers=left]
-# rank-based method
-def rank_based(training, holdout, lives=3): 
-  last_score = -1
-  independent_vals = list()
-  dependent_vals = list()
-  for count in range(1, len(training)):  
-      # Add one configuration to the training set
-      independent_vals += training[count]      
-      # Measure the performance value for the newly
-      # added configuration 
-      dependent_vals += measure(training_set[count])
-      # Build model
-      model = build_model(independent_vals, dependent_vals)     
-      # Predicted performance values
-      predicted_performance = model(holdout) 
-      # Compare the ranks of the actual performance 
-      # scores to ranks of predicted performance scores
-      actual_ranks = ranks(measure(holdout))
-      predicted_ranks = ranks(predicted_performance)
-      mean_RD = RD(actual_ranks, predicted_ranks)
-      # If current rank difference is not better than
-      # the previous rank difference, then loose life
-      if mean_rank_difference <= last_rank_difference:
-        lives -= 1
-      last_rank_difference = mean_RD
-      # If all lives are lost, exit loop
-      if lives == 0: break
-    return model
-      
-
-\end{lstlisting}
-\caption{\small{Python code of rank-based method.}
-}
-\label{fig:rank-based}  
-\end{figure}
-
-In a nutshell, instead of using residual measures of errors, as described in Equation~\ref{eq:err}, which depend on residuals ($r = y - f(x)$)\footnote{Refer to Section~\ref{sec:problem_formal} for definitions.}, it uses a rank-based measure. While training the performance model ($f(x)$), the configuration space is iteratively sampled (from the training pool) to train the performance model. Once the model is trained, the accuracy of the model is measured  by sorting the values of $y=f(x)$ from `small' to `large', that is:
-\begin{equation}
-    f(x_1) \le f(x_2) \le f(x_3) \le ... \le f(x_n).
-\end{equation}
-The predicted rank order is then compared to the actual rank order. The accuracy is calculated using the mean rank difference ($\mu RD$):
-\begin{equation} \label{eq:rank_performance}
-    \mathit{\mu RD} = \frac{1}{n} \cdot \mathlarger{\mathlarger{\sum}}_{i=1}^{n}\abs[\Big]{rank(y_i) - rank(f(x_i))}
-\end{equation}
-This measure simply counts how many of the pairs in the test data have been ordered incorrectly by the performance model $f(x)$ and measures the average of magnitude of the ranking difference. 
-
-
-
-In Figure~\ref{fig:rank-based}, we list a generic algorithm for the rank-based method. Sampling starts by selecting samples randomly from the training pool and by adding them to the training set (Line 8). Then, the collected sample configurations are evaluated (Line 11). The configurations and the associated performance measure are used to build a performance model (Line 13). The generated model (CART, in our case) is used to predict the performance measure of the configurations in the testing pool (Line 16). Since the performance value of the holdout set is already measured, hence known, the ranks of the actual performance measures, and predicted performance measure are calculated. (Lines 18--19). The actual and predicted performance measure is then used to calculate the rank difference using Equation~\ref{eq:rank_performance}. If the rank difference ($\mu RD$) of the model (with more data) does not decrease when compared to the previous generation (lesser data), then a life is lost (Lines 23--24). When all lives are expired, sampling terminates (Line 27).
-\begin{figure}[!t]
-\hspace{0.4cm}\begin{lstlisting}[xrightmargin=5.0ex,mathescape,frame=none,numbers=right]
-  # ePAL Multi-objective SMBO
-  def ePAL(all_configs,  $\varepsilon$, size = 20):  
-    # Add |\textit{size}| number of randomly selected 
-    # configurations to training data
-    train = random.sample(all_configs, size)
-    # Measure the performance value for sampled training data
-    train = [ measure(x) for x in train ]
-    # Remove the measured configurations from configuration space
-    all_configs = all_configs $\setminus$ train  
-    # Till all the configurations in all_configs has been either sampled or discarded 
-    while len(all_configs) > 0:
-      # Build GPM
-      model = GPM(train)
-      # Get prediction and corresponding confidence intervals
-      # associated with each configuration in all_configs
-      $\mu$, $\sigma$ = model.predict(all_configs)
-      # Only keep configurations discard based on uncertainty 
-      all_configs = all_configs - discard(all_configs,$\mu$, $\sigma$,  $\varepsilon$)
-      # Find and measure another point based on acquisition function.
-      new_point = measure(acquisition_function(all_configs, $\mu$, $\sigma$))
-      # Add new_point to train 
-      train += new_point
-    return train 
-\end{lstlisting}
-\caption{\small{Python code of ePAL, a multi-objective SMBO.}}
-\label{fig:ePAL}  
-\end{figure}
-
-\subsection{ePAL: ``Traditional SMBO''}\label{sec:epal}
-
-Unlike the residual-based and rank-based methods, epsilon Pareto Active Learning (ePAL) reflects on the evaluated configurations (and corresponding performance measures) to decide the next best configuration to measure using \textit{Maximum Variance} (predictive uncertainty) as an acquisition function.   ePAL incrementally updates a  model (GPM) representing a generalization
-of all samples (or configurations) seen so far. 
-The model can be used to decide the next most promising configuration to evaluate.  This ability to avoid unnecessary measurement (by just exploring a model)
-is very useful in the cases where each measurement can take days to weeks. 
-% Most prior work on BO   focused on single-goal optimization.
-% Algorithm~\ref{fig:ePAL} shows 
-% Zuluaga et al.'s  ePAL~\cite{zuluaga2016varepsilon}, a 
-% novel multi-objective
-% extension  of Bayesian optimization.
-% The algorithm inputs a large number of configurations (unevaluated).
-% Before entering its main loop, ePAL measures a small initial sample (randomly chosen) of 20 data items called training pool. The model
-% is then applied to the remaining configurations (of the configuration space) to learn the corresponding performance values as well as the confidence intervals ($\mu,\sigma$). .
-% ePAL also uses its model to select the next most informative data item
-% to evaluate. For this task, it selects the instance which is furthest away
-% from the known $\mu+\sigma$ of any objective.
-
-
-
-In Figure~\ref{fig:ePAL}, we list a generic algorithm for ePAL. ePAL starts by selecting samples randomly from the configuration space (\textit{all\_configs}) and by adding them to the training set (Line 5). The collected sample configurations are then evaluated (Line 7). The configurations and the associated performance values are used to build a performance model (Line 13). The generated model (GPM, in this case) is used to predict the performance values of the configurations in the testing pool (Line 16). Note that the model returns both the value ($\mu$) as well as the associated confidence interval ($\sigma$). These predicted values are used to discard configurations, which have a high probability of being dominated by another point (Line 18). Domination is defined in Equation~\ref{eq:bdom}~\footnote{ePAL then removes all  $\varepsilon$-dominated points:
-$a$ is discarded due to $b$ if $\mu_b + \sigma_b$  $\varepsilon$-dominates $\mu_a - \sigma_a$, where  
-$x$  $\varepsilon$-dominates $y$ if $x + \varepsilon \succeq  y$
-and  ``$\succeq$'' is   binary domination- see Equation~\ref{eq:bdom}}. After configurations (which have a high probability of being dominated) have been discarded, a new configuration (\textit{new\_point}) is selected and measured (Line 20). The selected configuration \textit{new\_point} is the most uncertain in \textit{all\_configs}. Then, \textit{new\_point} is added to \textit{train}, which is then used to build the model in the subsequent iteration (Line 22). When all the configuration in \textit{all\_configs} have been discarded (or evaluated and moved to train) the process terminates.
-
-Note again, since ePAL is a traditional SMBO, it shares its shortcomings (refer to Section~\ref{sec:bo_shortcomings}).
-
-% While an interesting method,  Bayesian optimization has certain limitation.
-% Building GPM can be very challenging for high dimensional data. So far,
-% the state of the art in this arena is the optimization of models with around ten decisions ~\cite{wang2016bayesian}. In the performance configuration optimization domain, this limitation can severely limit the practical applicability of the method.
-
-
-\section{{\bfseries FLASH}: A Fast Sequential Model-based Method}
  
-% Bayesian optimization is a useful tool to solve optimization problem but has certain limitations primarily scalability -- which is dependent on configuration options (cannot scale beyond ten options) and the size of the configuration space~\cite{shen2006fast} (refer to Section~\ref{sec:bo_shortcomings}), which hampers its practical usage.  Two major components of Bayesian Optimization are i) surrogate or machine learning model used, and ii) acquisition function.
-% There are various acquisition functions to choose from namely: 1) Maximum Mean, 2) Maximum Upper Interval, 3) Maximum Probability of Improvement, and 4) Maximum Expected of Improvement. 
-
-To overcome the shortcomings of the traditional SMBO, \flash makes certain design choices:
-\begin{itemize}[leftmargin=*]
-    \item {\sc Flash}\textquotesingle s acquisition function uses  \textit{Maximum Mean}. Maximum Mean returns the sample (configuration) with highest expected (performance) measure;
-    \item GPM is replaced with CART~\cite{breiman1984classification}, a fixed-point regression model. This is possible because the acquisition function requires only a single point value rather than the mean and the associated variance. 
-\end{itemize}
-When used in a multi-objective optimization setting, \flash models each objective as a separate performance (CART) model. This is because the CART model can be trained for one performance measure or dependent value. 
-
-The basic idea of CART is as follows: CART recursively partitions the set of configurations (based on a configuration option) into smaller clusters until the performance of the configurations in the clusters are similar. 
-Each split of the set of configurations is driven by a decision on the configuration option that would minimize the entropy or prediction error.
-These recursive clustering is represented as a binary decision tree. So, when we need to predict the performance of a new configuration not measured so far, we use the decision tree to find the cluster which is most similar to the new configuration.
-
-\flash replaces the {\em actual} evaluation of all configurations (which can be a very slow process) with a {\em surrogate evaluation}, where the CART decision trees are used to guess
-the objective scores (which is a very fast process). Once guesses are made,
-then some {\em select} operator must be applied to remove less-than-satisfactory configurations.
-Inspired by the
- decomposition approach of MOEA/D~\cite{zhang2007moea}, \flash uses
- the   following 
- stochastic Maximum Mean method, which we call {\em Bazza}\footnote{Short for ``bazzinga''.
-Also, ``Bazza'' is Australian for ``Barry''
-which the name of Barry Allen of the Flash T.V. series;
- and the childhood nickname of the 44th  United States President Barack Obama.}.
-
- For problems with $o$ objectives that we seek to maximize,
- {\em Bazza} returns the configuration that has outstandingly maximum objective values across $N$ random projections. Using the {\em predictions}
-for the $o$ objectives from the learned CART models,
-then {\em Bazza} executes as follows.  Note that the first step (randomly assigning weights to goals)
-is a technique we burrow and adapt from the MOEA/D algorithm~\cite{zhang2007moea}.
-
-\bi[leftmargin=*]
- \item
-$N$ vectors $V$ of length $m$ are generated and filled with random numbers of the range 0..1. This represents the various weight vectors.  The idea is to decompose one problem into a set of $N$ sub-problems (uniformly spread $N$ weight vectors.
-\item Set $\mathit{max=0}$ and $\mathit{best=nil}$.
-  \item For each configuration $x_i$
- \bi
- \item
- Guess its performance scores $y_{i,j}$ using the {\em predictions} from the CART models.
-\item
-Compute its mean weight as follows: 
-\begin{equation}\label{eq:mm}
- \centering
- mean_i=\frac{1}{N}\sum_n^N \sum_j^{{\mathit m}}\left(V_{n,j} \cdot x_{i,j}\right)
- \end{equation}
- \item
- If $\mathit{mean} > \mathit{max}$, then  $\mathit{max:=mean}$ and $\mathit{best}:=x_i$.
- \ei
-\item
-Return $\mathit{best}$.
-\ei
-
-In summary, given a set of $V$ weight vectors of length $m$,  {\em Bazza}  finds
-the vector that scores best across  $N$ different weighted sums, each of which is computed with random weight vectors.
-
-
-\begin{figure}
-\small
-\hspace{0.2cm}\begin{lstlisting}[xrightmargin=5.0ex,mathescape,frame=none,numbers=right]
-def FLASH(uneval_configs, fitness, size, budget):
-  # Add |size| number of randomly selected configurations to training data. 
-  # All the randomly selected configurations are measured
-  eval_configs = [measure(x) for x in sample(uneval_configs, size)]
-  # Remove the evaluations configuration from data
-  uneval_configs.remove(eval_configs)
-  # Till all the lives has been lost
-  while budget > 0:
-    # build one CART model per objective
-    for o in objectives: model[o] = CART(eval_configs)
-    # Find and measure another point based on acquisition function
-    acquired_point = measure(acquisition_fn(uneval_configs, model))
-    eval_configs += acquired_point  # Add acquired point 
-    uneval_config -= acquired_point # Remove acquired point 
-    # Stopping Criteria
-    budget -= 1
-  return best
-  
-def acquisition_fn(uneval_configs, model, no_directions=10):  
-  # Predict the value of all the unevaluated configurations using model
-  predicted = model.predict(uneval_configs)
-  # If number of objectives is greater than 1 (In our setting len(objectives) = 2)
-  if len(objectives) > 1: # For multi-objective problems
-    return  Bazza( predicted )
-  else:  # For single-objective problems
-    return max(predicted)  
-\end{lstlisting}
-\caption{Python code of \flash}
-\label{fig:flash_frame}  
-\end{figure}
-
-
-The resulting algorithm is shown in  Figure~\ref{fig:flash_frame}. 
-Before initializing \flash, a user needs to define three parameters \textit{N}, \textit{size}, and \textit{budget} (refer to Section~\ref{sec:parameter_tuning} for a sensitivity analysis). \flash starts by randomly sampling a predefined number (\textit{size}) of configurations from the configuration space and evaluate them (Line 4). The evaluated configurations are removed from the unevaluated pool of configurations (Line 6). The evaluated configurations and the corresponding performance measure/s are then used to build CART model/s (Line 10). This model (or models, in case of multi-objective problems) is then used by the acquisition function to determine the next point to measure (Line 13). The acquisition function accepts the model (or models) generated in Line 10 and the pool of unevaluated configurations (\textit{uneval\_configs}) to choose the next configuration to measure. The model is used to generate a prediction for the unevaluated configurations. 
-% The process of using a model to predict the performance measures of unevaluated configurations is similar to using prior information about to the configuration space to estimate the rest of the space. 
-For single-objective optimization problems, the next configuration to measure is the configuration with the highest predicted performance measure (Line 26). For multi-objective optimization problems, 
-{\em Bazza} is applied. The configuration chosen by the acquisition function is evaluated and added to the evaluated pool of configurations (Line 12-13) and removed from the unevaluated pool (Line 14). \flash terminates once it runs out of budget (Line 8). 
-
-
-% Note the advantages of this approach:
-% Firstly,
-% \flash only executes a benchmark, once per iteration; so, in terms of number of evaluations,
-% \flash  runs very fast. 
-
-% Secondly,  
-% for single-objective optimization problems,   prior approaches built accurate (either residual-based or rank-based) models to find (near) optimal configurations. The quality of the (sequential) model built is computed using Equations~\ref{eq:err} and~\ref{eq:rank_performance} on a holdout set. The size of this holdout set can be significantly high based on the size of the configuration space of the software system. \textit{\flash removes the need for such a holdout set and finds the (near) optimal configurations using fewer samples}. 
-
-% Thirdly, in multi-objective optimization problems,   prior approaches use the traditional SMBO techniques which are not scalable. 
-
-% Fourthly, {\em BarrySort} has a time complexity of $O(C)$ to return the best configuration from $C$ candidates.
-% Other methods are much slower as, for example,  non-dominated sort procedure (NSGA-II)~\cite{deb2002fast} which is~~$O(C^2)$. 
-% In practice, this can take
-%  hours to compute, especially for  software systems with very large  configuration spaces.  
-% That is, {\em BarrySort}  \textit{removes the short-comings of   prior work, which makes \flash more scalable.}
-
-
-Note the advantages of this approach:
-SMBO is a widely used method~\cite{hoffman2014modular}  for many important tasks (cloud configuration~\cite{alipourfard2017cherrypick}, hyperparameter optimization~\cite{bergstra2011algorithms}) so even a small improvement in this method would be significant for a large of number of domains
-Truly \flash includes many novel innovations. The following list shows the significant innovations of this work and the delta to prior research.  \\
-\textbf{1.} Evolutionary algorithms (EAs) have been used for optimizing black-box optimization~\cite{harman2009search}. Using Evolutionary Algorithms is relatively straightforward since it requires no domain knowledge to solve a problem.\\
-\noindent\textbf{Challenge:} Evolutionary algorithms suffer from two problems.
-Firstly, there is the issue of
-the number of evaluations required for an EA. A standard EA experiment is 100 individuals mutated for 100+ generations~\cite{sarro2016multi}. This renders Evolutionary Algorithms unsuitable for  our domain since individual evaluation can be very slow (requires re-running a benchmark suite).
-A second problem with EAs is the problem of slow convergence (i.e., the performance delta across these generations may be very slow and take a long time to stabilize ~\cite{chen2017beyond}).
-For this reason, research in this area in the last decade has explored non-EA methods for software configuration~\cite{siegmund2012predicting, guo2013variability, sarkar2015cost, nair17, nair2017using}.\\
-\noindent\textbf{New approach:} 
-\bi
-\item
-Here we explore SMBO for software configuration optimization. 
-\item
- While SMBO is gaining some popularity in other domains~\cite{alipourfard2017cherrypick, golovin2017google, shahriari2016taking },  this article is the first reporting a successful application of SMBO to software configuration.
-\ei
-\textbf{2.} Prior work in this area used some surrogate model learned by data mining (e.g., with CART ~\cite{guo2013variability, sarkar2015cost, nair17}),   possibly combined with random sampling. Such surrogates are useful for guiding the construction of better configuration models since they can be much faster to execute than (say) re-running a benchmark. Hence, an optimizer that uses such surrogates can terminate relatively quickly.\\
-\noindent\textbf{Challenge:} One drawback with  surrogate models is that they require a holdout set, against which the surrogate model (built iteratively) is evaluated. Interestingly, prior work does not discuss the cost of populating, which may require exploring up to  20\% of the total configuration space~\cite{nair2017using}.\\
-\noindent\textbf{New approach:} 
-\bi
-\item
-We found that applying SMBO removes the need for this hold out. We build the model incrementally, thus the configurations (and their performance) sampled at a given point in time used to intelligently select the next data point to collect.
-\item
-This work is the first successful application of such incremental model construction (with no holdout sets)  for software configuration.
-\ei
-\noindent \textbf{3.} Standard SMBO algorithms are a widely used method for finding good samples (as used in hyper-parameter optimization). Standard SMBO builds its models using a method called  Gaussian Process Models. Due to internal complexities of some of its matrix operations, GPM can  handle only a dozen configuration options (or less), while modern software may required many more configuration options. \\
-\noindent\textbf{Challenge:} How can we scale SMBO to much larger configuration options?\\
-\noindent\textbf{New approach:} 
-\bi
-\item
-One of the core innovations of this article is the use of CART (one CART per goal) for surrogate modeling. That is, we replace GPM with CART.  GPM takes time O($M^3$)~\cite{rasmussen2004gaussian} while recursive bifurcating algorithms like CART are much faster (takes time O($MN^2$) to build its trees where M is the size of the training dataset and N is the number of attributes~\cite{su2006fast}). Furthermore, methods such as  CART have been extensively studied, and very fast incremental versions are simple to implement---see Domingos et al.~\cite{domingos2000mining}, which is to say that if CART ever gets slow, there are many alternatives, we could try that would readily speed it up. 
-\item
-Theoretical complexity results aside, we demonstrate empirically that that our  CART-based method scales much better than GPM. As of 2016,  published state-of-the-art results~\cite{wang2016bayesian} report that they were unable to use more than 10 attributes within a GPM. As of 2018, our own experiments confirm that GPM cannot scale to more than a dozen configuration options. As shown in Figures~\ref{fig:multiconfig_time}(a) and (b),  \flash  scales linearly in number of attributes to models that defeats SMBO.
-We regard FLASH\textquotesingle s ability to scale linearly in number of attributes to be a major contribution  of this article.
-\ei
-\textbf{4.} One   advantages of SMBO algorithms such as GPM is that they identify   region(s) of most variance within a model. Such regions   represent zones of most uncertainty (and sampling there has greatest chance of most improving a model). \\
-\noindent\textbf{Challenge:} If we are not using GPM, how can we find the best regions for future sampling?\\
-\noindent\textbf{New approach:}
-\bi
-\item
-Another  core innovation is the \textit{Bazza} algorithm.   \textit{Bazza}   assumes that the greatest mean might contain the values that most extend to the desired maximal (or minimal) goals.   \textit{Bazza} finds that region in
- linear time (since it only has to track the most extreme values seen so far). 
-% The  first version of this paper we called this algorithm “BarrySort” . We now recognize that to be  a mislabel. Barry “Sort” does not sort all unlabelled examples; rather it runs over the data to find the most extreme values (which can be done in one-pass, hence O(M) time). To clarify that matter, in  this version of the paper we call it \textit{Bazza}.\\
-\item
-\textit{Bazza} is an important innovation since standard methods for finding the best candidates within a population of size M require time  O($M^2$)~\cite{deb2002fast}. But as shown in this article, our methods require only O(M).
-\ei
-\noindent5. The kernels used in Gaussian Process Model assume ``smoothness''~\cite{rasmussen2004gaussian}, or in other words, the configurations which are closer to each other have similar performance. In the case of software configuration, this assumption is highly unlikely since we know of many software options where a small change can lead to  radically different software performance
-(e.g. switching from link lists to  B-trees is a single change to  one value of one configuration option---but that change can lead to dramatic speed ups in the software).
-\noindent\textbf{Challenge:} How to avoid  GPM's smoothness assumptions?\\
-\noindent\textbf{New approach:} 
-\bi
-\item
-We use CART, a learner that recursively  bifurcates training data into different regions. The important point  here is that CART makes no assumption that neighboring regions have the same properties.
-\item
-Unlike prior work, our use of CART makes no limiting  assumptions about the smoothness of the space.
-\ei
-
-
-
-
-
-
-
-\section{Evaluation}
-
-
-
-\subsection{Research Questions}
-%\subsubsection{Single-objective Optimization}
-
-In prior work, performance configuration optimization was conducted by sequentially sampling configurations to build models, both accurate (residual-based method) and inaccurate (rank-based method). 
-% Residual-based method models the configuration space accurately to learn the dependencies between various configuration options. Once an accurate model is built or has captured all the trends of the configuration space, actual measurement can be replaced by the value predicted by the model. However, Nair et al.~\cite{nair2017using} reported that building such accurate model is not always feasible and proposed a rank-based method which builds a rank preserving model to conduct performance configuration optimization. 
-Both methods divide the configuration space into (i) training pool, (ii) validation set, and (iii) holdout set. They sequentially select a configuration from the training pool and add it to the training set (which is a subset of the training pool). The configuration (along with the corresponding performance measure) is used to build a model. Both methods use a validation set to evaluate the quality of the model. The size of the validation set is based on an engineering judgment and expected to be a representative of the whole configuration space. Prior work~\cite{nair2017using} used 20\% of the configuration space as holdout set, but did not consider the cost of using the validation set.% in their evaluations.
-
-Our research questions are geared towards assessing the performance of \flash based on two aspects: (i) \textbf{Effectiveness} of the solution or the rank-difference between the best configuration found by \flash to the actual best configuration, and (ii) \textbf{Effort} (number of measurements) required to find the better configuration.
-
-\noindent The above considerations lead to two research questions:
-\noindent\textbf{RQ1}\textit{: Can  \flash find the better configuration?}\\
-Here, the better configurations found using \flash are compared to the ones identified in prior work, using the residual-based and rank-based method. The effectiveness of the methods is compared using rank-difference (Equation~\ref{eq:rankdiff}). 
-
-
-\noindent\textbf{RQ2}\textit{: How expensive is \flash (in terms of
- how many configurations must be measured)?}\\
-It is expensive to build (residual-based or rank-based) models since they require using a holdout set. Our goal is to  demonstrate that \flash can find better configurations of a software system using fewer measurements.
-
-%\subsubsection{Multi-objective Optimization}
-To the best of knowledge, SMBO has never been used for multi-objective performance configuration optimization in software engineering. However, similar work has been done by Zuluaga et al.~\cite{zuluaga2016varepsilon} in the machine learning community, where they introduced ePAL. We use ePAL as a state-of-the-art method to compare \flash.
-
-We do not consider the work by Oh et al.~\cite{oh2017finding}, which uses true random sampling to find the better configurations. We do not compare \flash with Oh et al.\textquotesingle s method mainly for the following reason: Oh et al.\textquotesingle s work supports only Boolean configuration options, which limits its practical applicability. \flash, and the prior work considered in this article, do not have this limitation. Moreover, Oh\textquotesingle s work is limited to single-objective problems. 
-Since it does not build a performance model during the search process, it cannot be easily adapted  to multi-objective problems. 
-One may argue that running Oh et al.\textquotesingle s approach alternatively on different objectives (of a multi-objective problem) could lead to a set of solutions on the Pareto Front. However, this is not a proper alternative since these runs (on separate objectives) are independent of each other (i.e., they are run separately and cannot inform each other).%Even multiple runs using their approach would usually not lead to a set of solutions in the Pareto front, since the independent runs are not aware of each other.
-
-% epsilon-Pal (ePAL) aims at efficiently localize an epsilon accurate Pareto frontier of expensive multi-objective problems. The problems used to evaluate the method is done using one highly configurable system (LLVM) and two hardware configuration system namely, sort\_256 - hardware implementation of a sorting network and NoC - hardware implementation of a tree-based network-on-chip. ePAL uses GPM inference to predict the mean and standard deviation of any point. ePAL accepts a (large number of) unevaluated configurations (or samples) and approximates the performance measurement of (unevaluated) configuration by using a GPM which is trained using a few evaluated configurations. The (trained) GPM is used to select configurations to measure as well as discard configurations. 
-% However, it is difficult to scale ePAL to high dimensions because GPM does not scale to higher dimension (refer to section~\ref{sec:bo_shortcomings}). The time required to train a GPM increases exponentially with the number of dimensions as well as number of configurations (or the size of configuration space).   
-
-Since ePAL suffers from the shortcomings of traditional SMBO, our research questions are geared towards finding the estimated Pareto-optimal solutions (predicted Pareto Frontier~\footnote{Pareto Frontier is a set of solutions which are non-dominated by any other solution.}), which is \textit{closest} to the true Pareto Frontier (which requires measuring all configurations) with \textit{least effort}.  We assess the performance of \flash by considering three aspects: (i) \textbf{Effectiveness} of the configurations between the Pareto Frontier and the ones approximated by an optimizer, and \textbf{Effort} evaluated in terms of (ii) number of measurements, and (iii) time to approximate the Pareto Frontier.
-
-\noindent The above considerations lead to three research questions:
-\textbf{RQ3:} \textit{How effective is \flash for multi-objective performance configuration optimization?}\\
-The effectiveness of the solution or the difference between the predicted Pareto Frontier found by optimizers to the true Pareto Frontier,\\
-\textbf{RQ4:} \textit{Can \flash be used to reduce the effort of multi-objective performance configuration optimization compared to ePAL?}\\
-Effort  (number of  measurements)  required to estimate the Pareto Frontier which is closest to the true Pareto Frontier, and\\
-\textbf{RQ5} \textit{Does \flash save time for multi-objective performance configuration optimization compared to ePAL? }\\
-Since ePAL may take substantial time to find the approximate the Pareto Frontier, it is imperative to show that \flash can approximate the Pareto Frontier and converge faster.
-
-Our goal is to minimize the effort (time and number of measurements) required to find an approximate Pareto Frontier as close to the actual Pareto Frontier as possible.
-
-\subsection{Case Studies}
-
-We evaluated \flash in two different types of problems namely: (1) single-objective optimization problems and (2)  multi-objective optimization problems using 30 scenarios (15 scenarios in multi-objective settings) from 6 software systems. These systems are summarized in Table~\ref{fig:software_systems}.
-More details about the software systems are available at \url{http://tiny.cc/flash_systems/}.
-
-We selected these software systems since they are widely used in the configuration and search-based SE
-literature~\cite{siegmund2012predicting, guo2013variability, sarkar2015cost, nair17, nair2017using, oh2017finding, jamshidi2016uncertainty, zuluaga2016varepsilon} as benchmark problems for this kind of optimization work. Furthermore, extensive documentation
-is available at the supplementary Web site for all these models.
-
-\subsection{Experimental Rig}
- 
- \subsubsection{Exploring RQ1, RQ2}
- 
-For each subject system, we build a table of data, one row per valid configuration. We then run all configurations of all systems (that is, that are invoked by a benchmark) and recorded the performance scores. %To this table, we added a column showing the performance score obtained from the actual measurements for each configuration. 
-Note that, while answering the research questions, we ensure that we never test any prediction model on the data that we used to learn the model. 
-% Next, we repeat the following procedure 20 times. 
-
-To answer our research questions, we split the datasets into training pool (40\%), holdout set (20\%), and validation pool (40\%). The size of the holdout set is taken from prior work~\cite{nair2017using}. It is worth to note that this is a hyper-parameter and is set based on an engineering judgment. To perform a fair comparison while comparing \flash with prior work, the training pool and validation pool are merged for \flash experiments.
-
-
-The experiment to find better configuration using the residual-based and rank-based methods is conducted in the following way:
-\begin{itemize}[leftmargin=*]
-    \item Randomize the order of rows  in  the training data
-    \item \textbf{Do}
-    \begin{itemize}
-        \item Select one configuration (by sampling with replacement) and add it to the training set
-        \item Determine the performance scores associated with the configuration. This corresponds to a table look up but would entail compiling or configuring and executing a system configuration in a practical setting.
-        \item Using the training set and the accuracy, build a performance model using CART.
-        \item Using the data from the testing pool, assess the accuracy either using MMRE (as described in Equation~\ref{eq:err}) or rank difference (as described in Equation~\ref{eq:rank_performance}).         
-    \end{itemize}
-    \item \textbf{While} the accuracy is greater or equal to the threshold determined by the practitioner (rank difference in the case of rank-based method and MMRE in the case of residual-based method).
-\end{itemize}
-Once the model is trained, it is tested on the data in the validation pool. Please note, the learner has not been trained on the validation pool.
-The experiment to find better configuration by \flash is conducted in the following way:
-\begin{itemize}[leftmargin=*]
-    \item Choose 80\% of the data (at random)\footnote{We use 80\% because other method find the better configuration sampling from a training set of 40\% and test is against a testing pool of 40\%. To make sure, we make a fair comparison, we use \flash to find the best configuration among 80\% of the configuration space.}
-    \item Randomize the order of rows  in  the training data
-    \item \textbf{Do}
-    \begin{itemize}
-    \item Select 30 configurations (by sampling with replacement) and add them to the training set
-        \item Determine the performance scores associated with the configurations. This corresponds to  a table look up, but would entail compiling or configuring and executing a system configuration in a practical setting.
-        \item Using the training set, build a performance model using CART.
-        \item Using the CART model, find the configuration with best predicted performance.
-        \item Add the configuration with best predicted performance to the training set.
-    \end{itemize}
-    \item \textbf{While} the stopping criterion (\textit{budget}) is not met, continue adding configurations to the training set.
-\end{itemize}
-
-Once \flash has terminated, the configuration with the best performance is selected as the better configuration. Please note that unlike the methods proposed in prior work, there is no training and validation pool in \flash. It uses the whole space and returns the configuration with the best performance. 
-
-
-
-\textbf{RQ1} relates the results found by \flash to ones of residual-based and rank-based methods. We use the absolute difference between the ranks of the configurations predicted to be the best configuration and the actual optimal configuration. We call this measure rank difference.
-% (\textit{RD})
-\begin{equation}\label{eq:rankdiff}
-    \begin{split}
-        RD &= \abs[Big]{\mathrm{rank(actual_{best})} - \mathrm{rank(predicted_{best})}}\\
-        %   &= \abs{1 - \mathit{rank(predicted_{optimal})}}
-    \end{split}
-\end{equation}
-
-
-
-\noindent Ranks are calculated by sorting the configurations based on their performance scores. The configuration with the minimum performance score, $\mathrm{rank(actual_{best})}$, is ranked 1 and the one with the highest score is ranked as $N$, where $N$ is the number of configurations.
-
-
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.85\paperwidth, height=4.7cm]{Figures/one_obj_rd.eps}
-\caption{
-    \small{The rank difference of the prediction made by model built using the residual-based method, the rank-based methods, and \flash. Note that the y-axis of this chart rises to large values; e.g., SS-M has 239,260 possible configurations. Hence, the above charts could be summarized as follows: ``the \flash is surprisingly accurate since the rank difference is usually close to 0\% of the total number of possible configurations.'' 
-    %Since we are measuring rank difference, lower rank difference is better.
-    }
-}\label{fig:one_obj_rd}
-\end{figure*}
-
-\subsubsection{Exploring RQ3, RQ4, and RQ5}\label{sec:exp_mo}
-Similar to \textbf{RQ1} and \textbf{RQ2}, for each subject system, we build a table of data, one row per valid configuration. We then run all configurations of all systems and record the performance scores. To this table, we add two columns of measurements (one for each objective) obtained from measurements.
-
-
-
-To measure effectiveness, we use quality indicators as advised by Wang et al.~\cite{wang2016practical}. The quality indicators are:
-\bi[leftmargin=*]
-\item
-The \textit{Generational Distance} (GD)~\cite{van1999multiobjective} measures the closeness  of the solutions from by the optimizers to the 
-{\em Pareto frontier} that is, the actual set of non-dominated solutions. 
-\item
-The \textit{Inverted Generational Distance} (IGD)~\cite{coello2004study}
-is the mean distance from points on the  \textit{true} Pareto-optimal solutions to its nearest point in the predicted Pareto-optimal solutions returned by the optimizer.
-\ei
-Note that, for both measures, {\em smaller} values are {\em better}.
-Also,
-according to
-Coello et al.~\cite{coello2004study}, IGD is a better measure of how well solutions of a method are {\em spread}   across the space of all known solutions. A lower value of GD indicates that the predicted Pareto-optimal solutions have converged (or are near) to the actual Pareto-optimal solutions. However, it does not comment on the diversity (or spread) of the solutions. GD is useful while interpreting the results of \textbf{RQ3} and \textbf{RQ6}, where we would notice that \flash has low GD values but relatively high IGD values.
-
-
-
-
-To answer our research questions, we initialize ePAL and \flash with randomly selected configurations along with their corresponding performance scores. Since, ePAL does not have an explicit stopping criterion, we allow ePAL to run until completion. For \flash, we allowed a budget of 50 configurations. The value 50 was assigned by parameter tuning (from Section~\ref{sec:parameter_tuning}). The configurations evaluated during the execution of the three methods are then used to measure the quality measures (to compare methods).  Note that we use two versions of ePAL: ePAL with $\epsilon=0.01$ (ePAL\_0.01), and ePAL with $\epsilon=0.3$ (ePAL\_0.3)~\footnote{Refer to Section~\ref{sec:epal} for definition of $\epsilon$}. These ePAL versions represents two extremes of ePAL from the most cautious ($\epsilon=0.01$)---maximizing quality to most careless ($\epsilon=0.3$)---minimizing measurements.~\footnote{We have measured other values of epsilon between 0.01 and 0.3, but due to space constraints we show results from two variants of ePAL} 
-
-
-
-Other aspects of our experimental setting were designed in response to the specific features of the experiments. For example, all the residual-based, rank-based and \flash methods are implemented in Python. We use Zuluaga et al.\textquotesingle s implementation of ePAL, which was implemented in Matlab. Since we are comparing methods implemented in different languages, we measure ``speed'' in terms of the number of measurements (a language-independent feature) along with runtimes.
-
-
-
-
-\begin{figure}[tbh]
-    {
-{\scriptsize \begin{tabular}{l@{~~~}l@{~~~}r@{~~~}r@{~~~}c}
-\rowcolor{lightgray}\arrayrulecolor{lightgray}
-\textbf{SS-A2} & \textbf{} & \textbf{} & \textbf{} & \\\hline
-  1 &   Rank-based &    1.0  &  4.0 & \quart{0}{15}{3} \\
-  1 & Residual-based &    2.0  &  5.0 & \quart{0}{19}{7} \\
-\hline  2 &        Flash &    9.0  &  18.0 & \quart{7}{72}{35} \\
-\hline \end{tabular}}
-
-{\scriptsize \begin{tabular}{l@{~~~}l@{~~~}r@{~~~}r@{~~~}c}
-\rowcolor{lightgray}\arrayrulecolor{lightgray}
-\textbf{SS-C1} & \textbf{} & \textbf{} & \textbf{} & \\\hline
-  1 & Residual-based &    0.0  &  2.0 & \quart{0}{22}{0} \\
-  1 &   Rank-based &    1.0  &  3.0 & \quart{0}{34}{11} \\
-\hline  2 &        Flash &    3.0  &  6.0 & \quart{11}{68}{34} \\
-\hline \end{tabular}}
-
-{\scriptsize \begin{tabular}{l@{~~~}l@{~~~}r@{~~~}r@{~~~}c}
-\rowcolor{lightgray}\arrayrulecolor{lightgray}
-\textbf{SS-C2} & \textbf{} & \textbf{} & \textbf{} & \\\hline
-  1 &   Rank-based &    2.0  &  2.0 & \quart{0}{9}{4} \\
-  1 & Residual-based &    2.0  &  5.0 & \quart{0}{24}{4} \\
-\hline  2 &        Flash &    7.0  &  16.0 & \quart{0}{79}{29} \\
-\hline \end{tabular}}
-
-{\scriptsize \begin{tabular}{l@{~~~}l@{~~~}r@{~~~}r@{~~~}c}
-\rowcolor{lightgray}\arrayrulecolor{lightgray}
-\textbf{SS-E2} & \textbf{} & \textbf{} & \textbf{} & \\\hline
-  1 & Residual-based &    0.0  &  0.0 & \quart{0}{0}{0} \\
-\hline  2 &   Rank-based &    1.0  &  2.0 & \quart{0}{79}{39} \\
-  2 &        Flash &    1.0  &  1.0 & \quart{0}{39}{39} \\
-\hline \end{tabular}}
-
-{\scriptsize \begin{tabular}{l@{~~~}l@{~~~}r@{~~~}r@{~~~}c}
-\rowcolor{lightgray}\arrayrulecolor{lightgray}
-\textbf{SS-J1} & \textbf{} & \textbf{} & \textbf{} & \\\hline
-  1 & Residual-based &    0.0  &  1.0 & \quart{0}{1}{0} \\
-\hline  2 &        Flash &    1.0  &  13.0 & \quart{0}{24}{1} \\
-  2 &   Rank-based &    13.0  &  42.0 & \quart{1}{78}{24} \\
-\hline \end{tabular}}
-
-{\scriptsize \begin{tabular}{l@{~~~}l@{~~~}r@{~~~}r@{~~~}c}
-\rowcolor{lightgray}\arrayrulecolor{lightgray}
-\textbf{SS-J2} & \textbf{} & \textbf{} & \textbf{} & \\\hline
-  1 & Residual-based &    0.0  &  1.0 & \quart{0}{4}{0} \\
-\hline  2 &   Rank-based &    2.0  &  14.0 & \quart{0}{69}{9} \\
-  2 &        Flash &    4.0  &  16.0 & \quart{0}{79}{19} \\
-\hline \end{tabular}}
-
-{\scriptsize \begin{tabular}{l@{~~~}l@{~~~}r@{~~~}r@{~~~}c}
-\rowcolor{lightgray}\arrayrulecolor{lightgray}
-\textbf{SS-K1} & \textbf{} & \textbf{} & \textbf{} & \\\hline
-  1 & Residual-based &    0.0  &  1.0 & \quart{0}{26}{0} \\
-\hline  2 &   Rank-based &    1.0  &  3.0 & \quart{0}{79}{26} \\
-  2 &        Flash &    1.0  &  3.0 & \quart{0}{79}{26} \\
-\hline \end{tabular}}
-
-
-}
+\noindent\begin{minipage}{\linewidth}
+    \begin{center}
+    \arrayrulecolor{black}
+    \begin{tabular}{|p{0.95\linewidth}|}
+    \hline
+         \rowcolor[HTML]{FFFFFF}
+        Our goal is to find the near-optimal 
+configuration for a target environment ($S_{e_t}$), by learning from the measurements ($\langle c,y\rangle$) for the same system operating in different source environments ($S_{e_s}$). 
+\\\hline
+    \end{tabular}
+    \end{center}
+\end{minipage}
+\vspace{1mm} 
+
+In other words, we aim to reuse the measurements from a system operating in an environment to optimize the same system operating in the different environment thereby reducing the number of measurements required to find the near-optimal configuration.
+The rest of this paper describes and comparatively evaluates
+different methods for achieving this goal (where one of those
+methods is  BEETLE).
+
+
+\section{{\large Beetle: Bellwether Transfer Learner}}
+\label{sect:beetle}
+
+\input{tex/approach.tex}
+
+This section describes BEETLE, a bellwether based-approach that finds the near-optimal configuration using the knowledge in the bellwether environment. BEETLE can be separated into the following main steps: (i) finding the bellwether environment, and (ii) using the bellwether environment to find the near-optimal configuration for target environments. That is, BEETLE has then two key components:
+\be
+    \item \textit{Identifying the bellwether environment:} To train a transfer model, we use the bellwether effect to discover the best source environments (known as the \textit{bellwether environment}) among the available environments. 
     
-    \caption{
-        {\small 
-            The median rank difference of 20 repeats. Median ranks are the rank difference as described in Equation~\ref{eq:rankdiff}, and IQR the difference between 75th percentile and 25th percentile found during multiple repeats. 
-            Lines with a dot in the middle 
-            (~\protect\quartex{-2}{13}{6}), 
-            show the median as a round dot within the IQR.
-            All the results are sorted by the median rank difference: a lower median value is better. 
-            The left-hand column (\textit{Rank}) ranks the various methods for example when comparing three techniques. For SS-A2, a rank-based method has a different rank since their median rank difference is statistically different. Please note, this chart only shows software systems where \flash is significantly worse than methods from prior work.
-        }
-    }
-    \label{fig:stat-test}
-\end{figure}
+    \item \textit{Construct the Transfer Model:} Next, to perform transfer learning, we use these bellwether environments to train a performance prediction model with \textbf{regression tree}~\cite{breiman1996bagging}.
+\ee
 
-\begin{figure*}[t]
-        \centering
-        \includegraphics[width=0.7\paperwidth, height=6.3cm]{Figures/one_obj_evals.eps}
+Our intuition is that if a bellwether source environment is carefully selected, then it is possible to build a simple transfer model without any complex methods and still be able to generate near-optimal configurations in a target environment. 
 
-        \caption{
-        \small{
-        Measurements required to find better configurations with the residual-based method as the baseline.\vspace{5mm}}
-        }\label{fig:evals}
-\end{figure*}
+In Figures~\ref{fig:approach_a} \&~\ref{fig:approach_b}, we describe BEETLE and list an algorithm of BEETLE. In this example, there are seven source environments ($e_1, e_2,..., e_7$), which have been optimized previously. $e_8, e_9,..., e_{12}$ represents the target environments, which need to be optimized. BEETLE\textquotesingle s objective is to find a bellwether among the source environments and use it to find the near-optimal configuration for the target environments. 
+
+\subsection{Finding Bellwether Environments}\label{subsec:finding}
+
+From a formal perspective of finding a bellwether, BEETLE     is a  {\bf racing algorithm} that sequentially evaluates candidates and discards poor ones as soon as statistically sufficient evidence is found. The premise of such racing
+algorithms are that the elimination of inferior candidates speeds up the procedure and allows to evaluate promising candidates on more instances to obtain more reliable estimates of their behavior~\cite{birattari2002racing}.
+
+Fig.~\ref{fig:approach_a} shows how we find  bellwethers. The process starts by randomly sampling a small subset of configurations from the source environments. The size of the subset (of configurations) is controlled by a predefined parameter \textit{step\_size}, which defines the number of configurations to be sampled in each iteration (Line 6). 
+
+The cost of sampling the configuration is calculated (Line 8). In our case, we use the number of measurements as a proxy for cost. But, this can be replaced by any user-defined cost function (\textit{get\_cost}). To compute the effectiveness of an environment, the sampling configurations along with the performance measure is used to build a performance model (regression tree in this case). Please note that we chose regression tree as a model because it has been extensively used for performance prediction of configurable
+software systems and provided good results~\cite{guo2013variability, sarkar2015cost, nair2017faster, nair2017using, nair2018finding, guo2017data, valov2017transferring}. 
+
+Then, this model is used to predict the optimal configuration among the configurations sampled in Line 7 (Line 11). We only used the sampled configurations because the actual performance of a source can only be calculated if the actual performance values (associated with the configurations) are known. This process is repeated for all the environments (represented as \textit{sources}) under consideration. Depending on how an environment can find the near-optimal configuration for other environments and a user-defined threshold (\textit{thres}), non-bellwether environments are eliminated (Line 12). Non-bellwether environments are environments, which are not able to find near-optimal configurations for the other environments.  If the no environment is eliminated (with more
+data) when compared to the previous iteration
+(lesser data), then a life is lost (Line 14). When all lives are
+expired or we run out of the budget, the search process terminates. The environment with maximum performance is returned as the bellwether (Line 16). Please note that, \textit{FindBellwether} can identify multiple bellwethers ($e_1, e_2$). Also, note that the motivation behind using the parameter lives is to detect
+convergence of the search process and avoid resource wastage.
+
+
+
+\vspace{-0.2cm}
+\subsection{Using Bellwethers}
+
+Once the bellwether environment is identified, it can be used to find the near-optimal configurations of target environments. As shown in Fig.~\ref{fig:approach_b},   \textit{FindBellwether} returns the predicted bellwether environment (Line 3). Performance modeling then samples the bellwether environments (Line 5) for some number of samples (a user-defined parameter called budget).
+Please note that a user might choose to reuse the measurement used in \textit{FindBellwether} and save on cost. The sampled configurations and their corresponding performance measures are used to build a prediction model (Line 7). Similar to \textit{FindBellwether}, we use a regression tree as our modeling method of choice. The prediction model is then used to predict the optimal configuration in the for the target environment (Lines 8-9). The predicted optimal configuration is returned as the best configuration. This process is then repeated for each target environments ($e_8, e_9,..., e_{12}$).
+
+
+
+\vspace{-0.1cm}
+\section{Transfer Learning in Performance Optimization}
+\label{sect:tl}
+
+This section described the systems we use to evaluate  BEETLE comparatively.
+These alternate systems are   (a)~two state-of-the-art transfer learners for performance optimization: Valov et al.~\cite{van2017automatic} and Jamshidi et al.~\cite{jamshidi2017transfer}; and (b) a non-transfer learner: Nair et al.~\cite{nair2017using}. For details on these systems, see below.
+
+\input{tex/datasets.tex}
+\vspace{-0.2cm}
+\subsection{Transfer Learning with Linear Regression}
+
+Valov et al.~\cite{valov2017transferring} proposed an approach for transferring performance models of software systems across platforms with \textit{different hardware settings}. The method consists of the following two components: 
+\bi
+\item \textit{Performance prediction model:} The configuration source hardware are sampled using \textit{Sobol} sampling. The number of configurations is given by $T\times N_f$, where $T={3, 4, 5}$ is the \textit{training coefficient} and $N_f$ is the number of configuration options. These configurations are used to construct a \textit{Regression Tree} model.
+\item \textit{Transfer Model:} To transfer the predictions from the source to the target, a linear regression model is used since it was found to provide good approximations of the transfer function. To construct this model, a small number of random configurations are obtained from the source and the target. 
+\ei
+
+\vspace{-0.2cm}
+\subsection{Transfer Learning with Gaussian Process} 
+
+
+Jamshidi et al.~\cite{jamshidi2017transfer} took a slightly different approach to transfer learning. They used Gaussian Processes (GP) to find the relatedness between the performance measures in source and the target. The relationships between input configurations were
+captured in the GP model using a covariance matrix that
+defined the kernel function to construct the Gaussian processes model. To encode the relationships between the measured performance of the source and the target, a scaling factor is used with the above kernel. 
+
+% \input{tex/waterloo_peudo.tex}
+% \input{tex/pooyan_pseudo.tex}
+
+
+The new kernel function is a defined as follows:
+\begin{equation}
+    k(s, t, f(s), f(t)) = k_t(s, t) \times k_{xx}(f(s), f(t)),
+\end{equation}\label{eq:gpkernel}
+where $k_t(s,t)$ represents the multiplicative scaling factor. $k_t(s,t)$ is given by the correlation between source f(s) and target f(t) function, while $k_{xx}$ is the covariance function for input environments (s \& t). The essence of this method is that the kernel captures the interdependence  between the source and target environments. 
+\vspace{-0.2cm}
+\subsection{Non-Transfer Performance Optimization}
+\label{sect:nair}
+A performance optimization model with no transfer was proposed by Nair et al.~\cite{nair2017using} in FSE '17. It works as follows: 
+\be[leftmargin=*]
+\item Sample a small set of measurements of configurations from the target environment.
+\item Construct performance model with regression trees. 
+\item Predict for near-optimal configurations. 
+\ee
+The key distinction here is that unlike transfer learners, that use a \textit{different source environment} to build to predict for near-optimal configurations in a target environment, a non-transfer method such as this uses configurations \textit{from within the target} environment to predict for near-optimal configurations. 
+
+\section{Experimental Setup}
+\label{sect:expt}
+\subsection{Subject Systems}
+\label{sect:datasets}
+In this study, we selected five real-world configurable software systems from different domains, with different functionalities (a video encoder, an SAT solver, the SQLite database, a high-performance C-compiler, and streaming data analytics tool), written in different programming languages, and of varying sizes (Spear contains 16384 measurements). We selected these software systems since their characteristics cover a broad spectrum of scenarios with different size of the configuration space. \tab{datasets} lists the details of the software systems used here.
+
+\subsection{Evaluation Criterion}
+\label{sect:eval}
+Typically, performance models are evaluated based on the accuracy or error using measures such as MMRE. 
+ MMRE is defined as:
+\[
+    MMRE = \frac{|predicted-actual|}{actual} \cdot 100
+\]
+Recently, it has been shown that exact measures like MMRE
+can be somewhat misleading for the purposes of assessing
+configurations.
+In fact, there have been a lot of criticism regarding MMRE. MMRE along with other accuracy statistics such as MBRE have been shown to cause conclusion instability~\cite{myrtveit2012validity, myrtveit2005reliability, foss2003simulation}.
+
+Nair et al.~\cite{nair2017using} showed that even when exact MMRE values may be erroneous, the {\em relative rankings} of the  performance scores are still useful . Especially for pruning away less-than-desirable
+configurations~\cite{nair2017using}.    
+
+\input{RQ1.tex}
+For this reason, Nair et al.~\cite{nair2017using} argued for the use alternatives to MMRE in the performance optimization. Specifically, they propose \textit{rank-based metrics}. Here, the accuracy of a model is measured  by sorting the values of $y=f(x)$ from `small' to `large', that is:
+\begin{equation}
+    f(c_1) \le f(c_2) \le f(c_3) \le ... \le f(c_n).
+\end{equation}
+
+\noindent The predicted rank is then compared to the actual rank to compute the differences in ranking. We note that rank difference, though effective, is not particularly informative since it is sensitive to the workload. This means that in some workloads, \textit{a small difference in performance measure can lead to a large rank difference and vice-versa}. For example, in {\sc Spear\_0} the top performance of the optimal configuration (rank 1) and 100$^{th}$ best configuration has a difference of 0.09\%---which means a large rank difference of 100 does not mean poor performance. 
+
+Hence, we define a performance measure called \textit{Normalized Absolute Residual} (NAR), which represents the normalized difference between the actual performance measurements of the optimal configuration and the predicted optimal configuration. It is defined as: 
+\begin{equation}
+\label{eq:nar}
+{ \tiny
+    \mathit{NAR} = \frac{min(f(c)) - f(c^{*})}{max(f(c)) - min(f(c))} \cdot 100
+}
+\end{equation}
+where $c \in C_{A,h,w,v} \setminus c^*$. This measure is equivalent to Absolute Residual (lower is better). However, in our setting the range of the performance measures across different environments are not equal (hence the need for a normalization step). Formally, NAR is a variant of of Generational Distance or Inverted Generation Distance which used in search-based software engineering~\cite{wang2016practical, chen2018sampling, deb2002fast}.
+
+\subsection{Statistical Validation}
+\label{sect:stats}
+
+Our experiments are all subjected to inherent randomness introduced by sampling configurations or by different source and target environments. To overcome this, we use 30 repeated runs, each time with a different random number seed. The repeated runs provide us with a sufficiently large sample size for statistical comparisons. Each repeated run collects the values of NAR to assess the the transfer learners.
+
+To rank these 30 numbers collected as above, we use the Scott-Knott test 
+recommended by Mittas and Angelis~\cite{mittas13}. The Scott-Knott test has been endorsed by several SE researchers~\cite{leech2002call, poulding10, arcuri11, shepperd12a, kampenes07, Kocaguneli2013:ep}. Scott-Knott is a non-parametric statistical test that performs a bootstrap test with 95\% confidence~\cite{efron93} to determine the existence of statistically significant differences. This followed by an A12 test to check that any observed differences were not trivially small effects~\cite{Vargha00}. We say that a ``small'' effect has $a <0.6$. 
+Scott-Knott test results in treatments being ranked from best to worst. Note, statistically similar treatments will have the same ranks.
 
 \section{Results}
-\subsection{Single-objective Problems}\label{sec:so_results}
-\noindent\textbf{RQ1: Can  \flash find the better configuration?}\\
-Figure~\ref{fig:one_obj_rd} shows the \textit{Rank Difference} of the predictions using \flash, the rank-based method and the residual based method. 
-% For \flash, 80\% of the configuration space is used as input while for other methods 40\% of the configuration is used to train the model (which is tested against 20\% of configuration space) and tested against rest of the space.
-The horizontal axis shows subject systems. The vertical axis shows the rank difference (Equation~\ref{eq:rankdiff}).
+\label{sect:results}
+
+\noindent Our results are structured as answers to the following research questions.
+
+\subsection*{RQ1: Does there exist a Bellwether Environment?}\label{subsec:rq1}
+
+\noindent\textbf{\textit{\underline{Purpose:}}} The first research question seeks to establish the presence of  bellwether environments within different environments of a software system.\\
+\textbf{\textit{\underline{Approach:}}} For each subject software system, we use the environments to perform a pair-wise comparison as follows:
+\be[leftmargin=*]
+\item We pick one environment as a source and evaluate all configurations to construct a transfer learner.
+\item The remaining environments is used as targets. For every target environment, we use the transfer learner constructed in the previous step to predict for the best configuration.
+\item Then, we measure the NAR of the predictions (see \tion{eval}). % Briefly, this NAR reports the normalized absolute difference between predicted optima and the true optima of these target environments.
+\item Afterwards, we repeat steps 1, 2, and 3 for all the other source environments and gather the outcomes.
+\item Finally, we use Scott-Knott test to rank each environment (and its usefulness as a source).
+\ee
+\textbf{\textit{\underline{Result:}}}
+Our results are shown in Fig.~\ref{fig:rq1}. Overall, we find that there is always at least one environment (the bellwether environment) in all the subject systems, that is much superior to others. Note that, {\sc Storm} is an interesting case, here all the environments are ranked 1, which means that all the environments are equally useful as a bellwether environment
+---in such cases any randomly selected environment could serve as a bellwether. 
+Further, we note that the variance in the bellwether environments are much lower compared to other environments. 
+% Please note, in our experiments (except for SPEAR); we only use a sample of the configuration space to claim the existence of Bellwether. To further understand the implications of sampling, we redid the same experiment without 20\% of the configuration to assert if the bellwether is dependent on how we sampled the original configuration space (which is infeasible to measure). We found that the bellwether environment remains the same. We do not present the result due to space restrictions. 
+
+Since  sampling does not influence our results, we can say:
+\vskip 1ex
+\noindent\begin{minipage}{\linewidth}
+    \begin{center}
+    \arrayrulecolor{black}
+    \begin{tabular}{|p{0.95\linewidth}|}
+    \hline
+         \rowcolor[HTML]{EFEFEF} \textbf{\textit{\underline{Summary}}} There exists environments in each subject system, which act as the bellwether environment and hence can be used to find the near-optimal configuration for the rest of the environments.\\\hline
+    \end{tabular}
+    \end{center}
+    \end{minipage}
+    \vspace{0.1cm}
+
+\begin{table}[t]
+{\small
+    \centering
+    \caption{{\small Effectiveness of source selection method.}}
+    \label{tbl:method}
+    \begin{tabular}{@{}ccccc@{}}
+    \toprule
+    \multirow{2}{*}{\textbf{Subject System}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Bellwether\\ Environment\end{tabular}}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Predicted Bellwether\\ Environment\end{tabular}}} \\ \cmidrule(l){2-5} 
+     & \textbf{Median} & \textbf{IQR} & \textbf{Median} & \textbf{IQR} \\ \midrule
+    SQLite & 0.8 & 1.13 & 1.8 & 2.48 \\
+    Spear & 0.1 & 0.1 & 0.1 & 0 \\
+    x264 & 0.35 & 1.62 & 0.9 & 1.06 \\
+    Storm & 0.0 & 0.0 & 0.0 & 0.0 \\
+    SaC & 0.27 & 0.14 & 0.63 & 7.4 \\ \bottomrule
+    \end{tabular}
+}
+\end{table}
+
+
+
+\vspace{-0.25cm}
+\subsection*{RQ2: How many measurements are required to discover bellwether environments?}
+
+
+
+\noindent\textbf{\textit{\underline{Purpose:}}} The bellwether environments found in RQ1 required us to use 100\% of the measured performance values from all the environments\footnote{Note, except for SPEAR, we only have measured a subset of all possible configuration space since we were limited by the time and the cost required to make exhaustive measurements}. Sampling all configurations may not be practical, since that may take an extremely long time~\cite{jamshidi2017transfer2}. %It can be prohibitively expensive to run and test all configurations of subject systems since their configuration spaces are large. 
+Thus, in this research question, we ask if we can find the bellwether environments sooner using fewer samples. \\
+\textbf{\textit{\underline{Approach:}}}
+We used the racing algorithm discussed in Section~\ref{subsec:finding}. To see if our proposed method is effective, we compare the performance of bellwether environment with the predicted bellwether environment.
+
+% It works as follows
+% \be
+% \item We start from 1\% of configurations from each environment and assume that every environment is a potential bellwether environment.
+% \item Then, we increment the number of configurations in steps of 1\% and measure the NAR values. 
+% \item We rank the environments and eliminate those that do not show much promise. A detailed description of how this is accomplished can be found in~\S\ref{sect:beetle}. 
+% \item We repeat the above steps until we cannot eliminate any more environments.
+% \ee
+% The above strategy uses $\mu+\sigma$ of the NAR values at each step as a threshold to eliminate non-bellwether environments. To function correctly, this requires the NAR values to follow a normal distribution. If normality is violated, we used power transforms to make the data more normal distribution-like. We note that this is a common strategy commonly used in other domains to reduce the size of options or alternatives~\cite{borgelt2005keeping} and is also known as \textit{backward elimination}~\cite{blum1997selection}.
+\input{RQ2.tex}
+\noindent\textbf{\textit{\underline{Result:}}}
+Table~\ref{tbl:method} summarizes our findings. We find that, 
 \begin{itemize}[leftmargin=*]
-    \item 
-    % The ideal case -- when measurements corresponding to all possible configurations is known, is when optimal configuration can be found. 
-    The ideal result would be when all the points lie on the line \textit{y=0} or the horizontal axis, which means the method was able to find the better configurations for all subject systems or the rank difference between the predicted optimal solution and the actual optimal solution is 0. 
-    \item The sub-figures (left to right) represent the residual-based method, rank-based method, and \flash.
+    \item In all 5 cases, using at most 10\% of the configurations we find one of the bellwether environments that are found with 100\% of the measured configurations. See, column Rank in Table~\ref{tbl:method}. 
+    \item In terms of quality of predictions, the NAR of the predicted bellwether environments with 10\% of the configurations is different by $<1\%$ from the bellwether found at 100\%.
 \end{itemize}
 
-\noindent Overall, in Figure~\ref{fig:one_obj_rd}, we find that:
+ \begin{figure}[!t]
+    \centering
+    \includegraphics[width=1.04\linewidth]{figures/x264.png}
+    \caption{{\small Trade-off between the quality of the configurations and the cost to build the model for {\sc x264}. The cost to find a good configuration using bellwethers is much lower than that of non-transfer-learning methods. }}
+    \label{fig:tradeoffx264}
+\end{figure}
+These  results are most encouraging:
+
+%One may argue that this answer to this question trivially could be answered as "yes" since one could not expect all environments to exhibit identical performance, there will always be some environment that can make better predictions. However, observe that the environments ranked first performs much better than the rest (with certain exceptions), and hence, the difference between the bellwether environment and others is not coincidental.
+
+
+ \vskip 1ex
+\noindent\begin{minipage}{\linewidth}
+    \begin{center}
+    \arrayrulecolor{black}
+    \begin{tabular}{|p{0.95\linewidth}|}
+    \hline
+         \rowcolor[HTML]{EFEFEF} \textbf{\textit{\underline{Summary}}} The bellwether environment can be recognized using only a fraction of the measurements (under 10\%). Encouragingly, the identified bellwether environments have similar NAR values to the actual bellwether environment.  Note the importance of this results: running fewer configuration takes less time and is cheaper.\\\hline
+    \end{tabular}
+    \end{center}
+    \end{minipage}
+    \vspace{0.1cm}
+ 
+
+%  Note the importance of this results: running fewer configuration takes less time to collect and is cheaper (e.g. measured in cloud CPU time).
+%  Hence, we  can assert that discovering bellwether environments is economically very useful.
+ 
+ 
+\vspace{-0.1cm}
+\subsection*{RQ3: How does BEETLE compare to non-transfer  methods?}
+\label{sect:rq2}
+
+\noindent\textbf{\textit{\underline{Motivation}}}: We explore how BEETLE  compares to a non-transfer learning approach. For our experiment, we use the non-transfer performance optimizer proposed by Nair et al.~\cite{nair2017using}.
+Both BEETLE and Nair et al.'s methods seek to achieve the same goal---find the optimal configuration in a target environment. BEETLE uses configurations from a \textit{different source} to achieve this, whereas the non-transfer learner uses configurations from \textit{within the target}. Please note BEETLE only uses 10\% of the configurations from the bellwether environment.\\
+\textbf{\textit{\underline{Approach:}}} Our setup involves evaluating the Win/Loss ratio of BEETLE to the non-transfer learning algorithm while predicting for the optimal configuration. Comparing against true optima, we define ``win'' as cases where BEETLE has a better (or same) optima as the non-transfer learner or a ``loss''.\\
+\textbf{\textit{\underline{Result:}}}
+Our results are shown in Figures~\ref{fig:rq2_1} and \ref{fig:tradeoffx264}. In \fig{rq2_1}, the x-axis represents the number of configurations (expressed in \%) to train the non-transfer learner and BEETLE, and the y-axis represents the number of wins/losses. We observe:
 \begin{itemize}[leftmargin=*]
-    \item All methods can find better configurations. For example, \flash for SS-J1 predicted the configuration whose performance score is ranked 20th in configuration space. That is \textit{good enough} since \flash finds the 20th most performant configuration among 3072 configurations.%\footnote{Since we test only on 80\% of the total configuration space.}.
-    \item The mean rank difference of the predicted optimal configuration is 6.082, 5.81, and 5.58~\footnote{The median rank difference is 1.61, 2.583, and 1.28.} for residual-based, rank-based, and \flash. 
-\end{itemize}
-So, the rank of the better configuration found by all the three methods is practically the same. To verify the similarity is statistically significant, we further studied the results using non-parametric tests Scott-Knott test  recommended by Mittas and Angelis~\cite{mittas13} and Arcuri \& Briand~\cite{mittas13}.
-
-
-Scott-Knott is a top-down clustering approach used to rank different treatments. If the approach finds an interesting division of the data, then some 
-statistical test is applied to the two divisions to check if they are 
-statistically significantly different. If so, Scott-Knott recurses into both 
-halves.
-To  apply Scott-Knott, we sorted a list of  $l=20$ values of performance of different method found by different methods. Then, we split $l$ into 
-sub-lists $m,n$ to maximize the expected value of differences in 
-the observed performances before and after division. For example, for lists 
-$l,m,n$ of size $ls,ms,ns$ where $l=m\cup n$: 
-\[E(\Delta)=\frac{ms}{ls}|m.\mu - l.\mu|^2 + \frac{ns}{ls}|n.\mu - 
-l.\mu|^2\] 
-We then apply a   statistical hypothesis test $H$ to check
-if $m,n$ are significantly different  (in our case, the conjunction of A12 
-and bootstrapping). If so, Scott-Knott recurses on the splits. In other 
-words, we divide the data if \textit{both} bootstrap sampling and effect 
-size test agree that a division is statistically significant (with a 
-confidence level of 99\%) and not a small effect ($A12 \ge 0.6$).
-
-For a justification of the use of non-parametric bootstrapping, see Efron 
-\& Tibshirani~\cite[p220-223]{efron93}. For a justification of the use of 
-effect size tests, see Shepperd and MacDonell~\cite{shepperd12a}; 
-Kampenes~\cite{kampenes07}; and Kocaguenli et 
-al.~\cite{Kocaguneli2013:ep}. These researchers warn that, even if a 
-hypothesis test declares two populations to be ``significantly'' 
-different, then that result is misleading if the ``effect size'' is very 
-small. Hence, to assess the performance differences we first must rule out 
-small effects using A12.
-
-
-
-In Figure~\ref{fig:stat-test}, we show the Scott-Knott ranks for the three methods. The quartile charts show the Scott-Knott results for the subject systems, where \flash did not do as well as the other two methods. For example, the statistic test for SS-C2 shows that the rank difference of configurations found by \flash is statistically larger from the other methods. This is reasonably close, since the median rank of the configurations found by \flash is 7 of 1512 configurations, where for the other methods found configurations have a median rank of 2. As engineers, we feel that this is close because we can find the 7th best configuration using 34 measurements compared to 339 and 346 measurements used by other methods. Overall, our results indicate that:
-\vskip 1ex
- \begin{myshadowbox}
-         \flash can find better configurations, similar to the residual-based and the rank-based method, of a software system without using a holdout set. 
- \end{myshadowbox}
-
-\noindent\textbf{RQ2:  How expensive is \flash (in terms of how many configurations must be executed)?}\\
-To recommend \flash as a cheap method for performance optimization, it is important to demonstrate that it requires fewer measurements to find the better configurations. In our setting, the cost of finding the better configuration is quantified by number of measurements required (i.e., table lookup). Figure~\ref{fig:evals} shows our results. 
-The vertical axis represents the ratio of the measurements of different methods
-are represented as the percentage of number of measurements required
-by residual-based method – since it uses the most measurements
-in 66\% scenarios.
-
-
-Overall, we see that \flash requires the least number of measurements to find better configurations. For example, in SS-E1, \flash requires 9\% of the measurements when compared with the residual-based method and the rank-based method.  There are few cases (SS-M1 to SS-O2) where \flash requires less than 1\% of the residual-based method, which is because these systems have a large configuration space and the holdout set required by the residual-based method and the rank-based method (except \flash) uses 20\% of the measurements. 
-\vskip 1ex
- \begin{myshadowbox}
-        For performance configuration optimization, \flash is cheaper than the state-of-the-art method. In 57\% of the software systems, \flash requires an order of magnitude fewer measurement compared to the residual-based method and rank-based method.  
- \end{myshadowbox}
-
-
-
-
-\subsection{Multi-objective Optimization}\label{sec:mo_results}
-
-\noindent\textbf{RQ3: How effective is \flash for multi-objective performance configuration optimization?} \\
-Table~\ref{table:multi-config} shows the results of a statistical analysis that compares the quality measures of the approximated Pareto-optimal solutions generated by \flash to those generated by ePAL.
-\begin{itemize}[leftmargin=*]
-    \item The rows of the table shows median numbers of 20 repeated runs over 15 different scenarios.
-    \item The columns report the quality measures, generational distance (GD), and inverted generation distance (IGD). Recall \textit{smaller} values of GD and IGD are \textit{better}.
-    \item `\textbf{X}' denotes cases where a method did not terminate within a reasonable amount of time (10 hours).
-    \item \textbf{Bold}-typed results are statistically better than the rest.
-    \item The last row of the table (Win (\%)) reports the percentage of times a method is significantly better than other methods overall software systems.
-\end{itemize}
-
-One way to get a quick summary of this table is to read the last row (Win(\%)). This row is the percentage number of times a method was marked statistically better than the other methods. From Table~\ref{table:multi-config}, we can observe that \flash outperforms variants of ePAL since \flash has the highest Win(\%) in both quality measures. This is particularly true for scenarios with more than 10 configuration options, where ePAL failed to terminate while \flash always did. 
-
-We further notice that ePAL-0.01 has a higher win percentage than ePAL-0.3. This is not surprising since (as discussed in Section~\ref{sec:exp_mo}) ePAL-0.01 (optimized for quality) is more cautious than ePAL-0.3 (which is optimized for speed measured in terms of number of measurements). This can be regarded as a sanity check.  It is interesting to note that \flash has impressive convergence score (lower GD scores)---it converges better for 93\% of the systems, but not so remarkable in terms of the spread (lower IGD scores). However, the performance of \flash is similar to ePAL.
-It is also interesting that, for software systems where \flash was not statistically better, these are cases where the statistically better method always converged to the actual Pareto Frontier (with few exceptions). 
-% This can be attributed to a large number of evaluations performed by ePAL (as shown in RQ5). 
-
-\vskip 1ex
- \begin{myshadowbox}
-         \flash is effective for multi-objective performance configuration optimization. It also works in software systems with more than 10 configuration options whereas ePAL does not terminate in  reasonable time.
- \end{myshadowbox}
-
-\begin{table*}[]
-\centering
-\caption{Statistical comparisons of \flash and ePAL regarding the Performance measures are GD
-(Generational Distance), IGD (Inverted Generational Distance) and a number of measurements. For all measures, less is better; “X” denotes cases where methods did not terminate within a reasonable amount of time (10hrs). The numbers in bold represent statistically better runs than the rest. For example, for SS-G, GD of \flash is statistically better than of ePAL.}\label{table:multi-config}
-\begin{tabular}{@{}lrrrrrrrrr@{}}
-\toprule
-\multirow{2}{*}{\textbf{Software}} & \multicolumn{3}{c}{\textbf{GD}} & \multicolumn{3}{c}{\textbf{IGD}} & \multicolumn{3}{c}{\textbf{Evals}} \\ \cmidrule(l){2-10} 
- & \multicolumn{1}{l}{\textbf{epal\_0.01}} & \multicolumn{1}{l}{\textbf{epal\_0.3}} & \multicolumn{1}{l}{\textbf{\flash}} & \multicolumn{1}{l}{\textbf{epal\_0.01}} & \multicolumn{1}{l}{\textbf{epal\_0.3}} & \multicolumn{1}{l}{\textbf{\flash}} & \multicolumn{1}{l}{\textbf{epal\_0.01}} & \multicolumn{1}{l}{\textbf{epal\_0.3}} & \multicolumn{1}{l}{\textbf{\flash}} \\ \midrule
-\textbf{SS-A} & \textbf{0.002} & \textbf{0.002} & \textbf{0} & \textbf{0.002} & 0.002 & \textbf{0} & 109.5 & 73.5 & \textbf{50} \\
-\textbf{SS-B} & \textbf{0} & \textbf{0} & \textbf{0.005} & \textbf{0} & 0.003 & 0.001 & 84.5 & \textbf{20} & \textbf{50} \\
-\textbf{SS-C} & \textbf{0.001} & \textbf{0.001} & \textbf{0.003} & \textbf{0.004} & \textbf{0.004} & \textbf{0} & 247 & 101 & \textbf{50} \\
-\textbf{SS-D} & \textbf{0} & \textbf{0.004} & \textbf{0.014} & \textbf{0.002} & 0.007 & 0.009 & 119.5 & 67 & \textbf{50} \\
-\textbf{SS-E} & \textbf{0.001} & \textbf{0.001} & \textbf{0.012} & \textbf{0.004} & 0.008 & 0.002 & 208 & 54.5 & \textbf{50} \\
-\textbf{SS-F} & \textbf{0} & 0.016 & 0.008 & \textbf{0} & 0.006 & 0.016 & 138 & 71 & \textbf{50} \\
-\textbf{SS-G} & \textbf{0} & \textbf{0} & \textbf{0.023} & \textbf{0.003} & 0.006 & 0.004 & 131 & 69 & \textbf{50} \\
-\textbf{SS-H} & \textbf{0} & \textbf{0} & \textbf{0} & \textbf{0} & \textbf{0} & \textbf{0} & 52 & \textbf{28} & \textbf{50} \\
-\textbf{SS-I} & 0.008 & 0.018 & \textbf{0} & 0.008 & 0.018 & \textbf{0} & 48 & \textbf{30} & \textbf{50} \\
-\textbf{SS-J} & \textbf{0} & \textbf{0} & \textbf{0.002} & \textbf{0.002} & \textbf{0.002} & \textbf{0} & 186 & \textbf{30} & \textbf{50} \\
-\textbf{SS-K} & \textbf{0.001} & \textbf{0.001} & \textbf{0.003} & \textbf{0.001} & \textbf{0.002} & \textbf{0.001} & 209 & 140 & \textbf{50} \\
-\textbf{SS-L} & \textbf{0.01} & \textbf{0.028} & \textbf{0.006} & \textbf{0.007} & \textbf{0.008} & \textbf{0.009} & 68.5 & \textbf{35} & \textbf{50} \\
-\textbf{SS-M} & X & X & \textbf{0} & X & X & \textbf{0} & X & X & \textbf{50} \\
-\textbf{SS-N} & X & X & \textbf{0.065} & X & X & \textbf{0.015} & X & X & \textbf{50} \\
-\textbf{SS-O} & X & X & \textbf{3.01E-07} & X & X & \textbf{3.20E-06} & X & X & \textbf{50} \\ \midrule
-\textbf{Win (\%)} & 73 & 67 & \textbf{93} & \textbf{67} & 33 & \textbf{67} & 0 & 33 & \textbf{80} \\ \bottomrule
-\end{tabular}
-
-\end{table*}
-
-\noindent\textbf{RQ4: Can \flash be used to reduce the effort of multi-objective performance configuration optimization compared to ePAL?}\\
-In the RQ4 section (right-hand side) of Table~\ref{table:multi-config}, the number of measurements required by methods, ePAL, and \flash are shown. Rows show different software systems and columns shows the number of measurements associated with each method. The numbers highlighted in bold mark methods that are statistically better than the other. For example in SS-K, \flash uses statistically fewer samples than (variants of) ePAL. 
-
-From the table we observe:
-\begin{itemize}
-    \item \flash uses fewer samples than ePAL\_0.01. In 9 of 15 cases, ePAL\_0.01 is, at least, two times better than \flash.
-    \item (Variants of) ePAL does not terminate for SS-M, SS-N, and SS-O even after ten hours of execution---a pragmatic choice. The reason for this can be seen in Table~\ref{fig:software_systems}: these software systems have more than 10 configuration options and the GPMs used by ePAL does not scale beyond that number. 
-    \item The obvious feature of Table~\ref{table:multi-config} is that \flash used fewer measurements in 12 of 15 software systems.
+\item \textit{Better performance:} In $\frac{4}{5}$ systems, BEETLE ``wins'' significantly more than it ``losses''. This means that BEETLE is better than (or similar to) non-transfer learning methods. 
+\item \textit{Lower cost:} In terms of cost, we note that BEETLE outperforms the non-transfer learner significantly, ``winning'' at configurations of 10\%  to 100\% of the original sample size. Further, when we look at the trade-off between performance and number of measurements in \fig{tradeoffx264}, we note that BEETLE achieves a NAR close to zero with around 100 samples. Also, the non-transfer learning method of Nair et al.~\cite{nair2017using} has significantly larger NAR while also requiring large sample sizes. Hence, we say:\\
 \end{itemize}
 \vskip 1ex
- \begin{myshadowbox}
-         \flash requires fewer measurements than ePAL to approximate Pareto-optimal solutions. The number of evaluations used by \flash is less than (more careful) ePAL-0.01 for all the software systems and 12 of 15 software systems for (more careless) ePAL-0.3.
- \end{myshadowbox}
+\noindent\begin{minipage}{\linewidth}
+    \begin{center}
+    \arrayrulecolor{black}
+    \begin{tabular}{|p{0.95\linewidth}|}
+    \hline
+     \rowcolor[HTML]{EFEFEF} \textbf{\textit{\underline{Summary}}} BEETLE performs better than (or same as) a non-transfer learning approach. BEETLE is also cost/time efficient as it requires far fewer measurements.\\\hline
+    \end{tabular}
+    \end{center}
+    \end{minipage}
+    \vspace{0.1cm}
+\vspace{-0.1cm}
+\subsection*{RQ4: How does BEETLE compare to state-of-the-art methods?}\label{subsec:rq4}
 
+\noindent\textbf{\textit{\underline{Purpose:}}} The main motivation of this work is to show that the source environment can have a significant impact on transfer learning.  In this research question, we seek to compare BEETLE with other state-of-the-art transfer learners by Jamshidi et al.~\cite{jamshidi2017transfer} and Valov et al.~\cite{valov2017transferring}.\\
+\textbf{\textit{\underline{Approach:}}} We perform transfer learning the methods proposed by Valov et al.~\cite{valov2017transferring} and Jamshidi et al.~\cite{jamshidi2017transfer} (see~\tion{tl}). Then we measure the NAR values and compare them statistically using Skott-Knott tests. Finally, we rank the methods from best to worst based on their Skott-Knott ranks.\\
+\textbf{\textit{\underline{Result:}}}
+Our results are shown in Fig.~\ref{fig:rq4}. In this figure, the best transfer learner is ranked 1. We note that in 4 out of 5 cases, the baseline transfer learner based on source selection performs just as well as (or better than) the state-of-the-art. This result is encouraging in that it points to significant impact choosing a good source environment can have on the performance of transfer learners. Further, in ~\fig{rq4_measurement} we compare the number of performance measurements required to construct the transfer learners (note the logarithmic scale on the vertical axis). Based on these results, we say:
+%results, BEETLE requires far fewer measurements compared to the other transfer-learning methods. %Considering the scalability and negative transfer issues (as discussed in Section 1) of the state of the art techniques along with the effectiveness of BEETLE using (much) fewer configurations, we recommend using BEETLE.
 
-\noindent\textbf{RQ5:Does \flash save  time  for  multi-objective  performance configuration optimization compared to ePAL?} \\
-Figure~\ref{fig:multiconfig_time} compares the run times of ePAL with \flash. Please note that we use the author\textquotesingle s version of ePAL in our experiments, which is implemented in Matlab. However, \flash was implemented in Python. Even though this may not be a fair comparison, for the sake of completeness, we report the run-times of the test. The sub-figure to the left shows how the run times vary with the number of configurations of the system. The x-axis represents the number of configurations (in log scale), while the y-axis represents the time taken to perform 20 repeats in seconds (in log scale), which means lower the better. The dotted lines in the figure, shows the cases where a method (in this case, ePAL) did not terminate. The sub-figure in the middle represents how the run-time varies with the number of configuration options. The x-axis represents the number of configuration options, and the y-axis represents the time taken for 20 repeats in seconds (in log scale), which means lower the better. The sub-figure to the right represent the performance gain achieved by \flash over (variants of) ePAL. The x-axis shows the software systems, and the Y-axis represents the gain ratio.   Any bar higher than the line  (y=1) represent cases where \flash is better than ePAL. 
+\vskip 1ex
+\noindent\begin{minipage}{\linewidth}
+    \begin{center}
+    \arrayrulecolor{black}
+    \begin{tabular}{|p{0.95\linewidth}|}
+    \hline
+         \rowcolor[HTML]{EFEFEF} \textbf{\textit{\underline{Summary}}} In most software systems, BEETLE performs just as well as (or better than) other state-of-the-art transfer learners for performance optimization using far fewer measurements.\\\hline
+    \end{tabular}
+    \end{center}
+    \end{minipage}
+    \vspace{0.1cm}
 
-From the figure, we observe:
-\begin{itemize}
-    \item From sub-figures left and middle, \flash is much faster than (variants of) ePAL except in 2 of 15 cases. 
-    \item The run times of ePAL increase exponentially with the number of configurations and configuration options, similar to the trend reported in the literature.
-    \item (Variants of) ePAL does not terminate for cases with large numbers of configurations and configuration options, whereas \flash always terminates an order of magnitude faster than ePAL. This effect is magnified in case of a scenarios with large configuration space.
-\end{itemize}
-Overall our results indicate:
-\vskip 0.5ex
- \begin{myshadowbox}
-         \flash saves time and is faster than (variants of) ePAL in 13 of 15 cases. Furthermore, \flash is an order of magnitudes faster than ePAL in 5 of 15 software systems. In other 2 out of 15 cases, the \flash\textquotesingle s runtimes are similar to (variants of) ePAL.
- \end{myshadowbox}
-
-
-\begin{figure*}[htp]
-\centering
-\includegraphics[width=0.85\paperwidth, height=7cm]{Figures/time_consolidated}
-\caption{The time required to find better solutions using ePAL and Flash (sum of 20 repeats). Note that the axis\textquotesingle s of the first two figures (left, and center) are in log scale. The time required for \flash compared to (variants of) ePAL is much lower (with an exception on 2 of 15 software systems). The dashed line in the figure (left and middle) represents cases where ePAL did not terminate within a reasonable time (10 hours). In the right-hand figure, we show the performance gain (wrt. to time) achieved by using \flash. All the bars above the dashed line (y=1) performs worse than \flash.}
-\label{fig:multiconfig_time}
-\end{figure*}
-
-\begin{figure}
-\centering
-\includegraphics[height=6cm,width=7cm]{Figures/tuning_1.eps}
-\caption{The trade-off between the number of starting samples (exploration) and number of steps to converge (exploitation). The ideal point in these trade-off curves is (0,0), which mean the algorithm has perfect convergence ($GD=0$) and perfect diversity ($IGD=0$). The trade-off curve for multi-objective performance configuration optimization is shown with budget of 50 evaluations.}\label{fig:param_tuning_multiconfig}
-\end{figure} 
-
-\section{Discussion}
-% \subsection{Can ideas from different communities be combined?}
-% A wide range 
-% of SE tasks is a optimization  problem where an optimization algorithm must navigate
-% through a complex space of constraints to find solutions while balancing between multiple competing objectives. Software engineering problems used in this paper are examples for such problems.
-% % For example:
-% % \begin{enumerate}
-% % \item[(a)]
-% %  An optimized \textit{agile project} selects use cases from a backlog    that deliver the {\em most} requirements in the {\em least} time~\cite{port08};
-% %  \item[(b)]
-% %  An optimized\textit{ waterfall  project} uses   {\em fewest} programmers to deliver  {\em most} code with  {\em fewest} bugs in 
-% %  {\em least} time~\cite{menzies2009avoid};
-% %  \item[(c)]
-% %  An optimized \textit{release planner} delivers the {\em most} functionality with the {\em least} cost while
-% %  {\em minimizing} risks and {\em  maximizing} customer satisfaction~\cite{zhang2007moea};
-% %  \item[(d)]
-% %  An optimized configuration engine {\em most} explores the measure of interest of the  stakeholder (for example, runtime, throughput etc.) after reflecting on the {\em fewest} configurations~\cite{zuluaga2016varepsilon,siegmund2012predicting}.
-% % \end{enumerate}
-% %A perennial question is which algorithm to use to optimize these tasks. Recent literature reviews report that the  search-based SE (SBSE) community makes extensive use of only two or three evolutionary algorithms~\cite{chen2017beyond}. 
-% This is curious since similar problems have been tacked in various other communities using different methods:
-% \begin{itemize}[leftmargin=*]
-% \item
-% Researchers in \textit{software analytics} have shown
-% that their standard algorithms can be readily adapted
-% to optimizing SE tasks -- sometimes significantly out-performing  EA methods~\cite{krall2015gale,nair17,Nair2016}.
-% \item
-% For such optimization tasks, machine learning researchers prefer \textit{Bayesian optimization}~\cite{bpo1,bpo2,zuluaga2013active}.
-% \item
-% Researchers in \textit{Evolutionary Algorithms} (Evolutionary Algorithms)
-% are always improving their  algorithms~\cite{deb2002fast,deb2014evolutionary,zhang2007moea}.
-% \end{itemize}
-
-% \noindent Given this situation a valid question to ask is:
-% {\em is there any advantage in combining ideas from different research communities?}
-
-% In this paper, we experimented with a new method called \flash which combines ideas from these research communities.  When tested on performance configuration optimization, \flash is often a ``better'' method. 
-
-\subsection{Why CART is used as the surrogate model?}
-Decision Trees are a very simple way to learn rules from a set of examples and can be viewed as a tool for the analysis of a large dataset. The reason why we chose CART is two-fold. Firstly, it is shown to be \textit{scalable} and there is a growing interest to find new ways to speed up the decision tree learning process~\cite{su2006fast}. 
-Secondly, a decision tree can \textit{describe} with the tree structure the dependence between the decisions and the objectives, which is useful for induction and comprehensibility.
-These are the primary reasons for choosing decision-trees to replace Gaussian Process as the surrogate model for \flash.
-
-\subsection{What is the trade-off between the starting size and budget of {\sc \textbf{Flash}}?}\label{sec:parameter_tuning}
-
-
-
-There are two main parameters of \flash which require being set very carefully. In our setting, the parameters are \textit{size} and \textit{budget}. The parameter \textit{size} controls the exploration capabilities of \flash whereas parameter \textit{budget} controls the exploitation capabilities. 
-In Figure~\ref{fig:param_tuning_multiconfig}, we show the trade-off 
-between generational distance and inverted generational distance 
-by varying parameters \textit{size} and \textit{budget}. 
-The markers in Figure~\ref{fig:param_tuning_multiconfig} are annotated with the starting size of \flash. The trade-off characterizes the relationship between two conflicting objectives, for example in Figure~\ref{fig:param_tuning_multiconfig}, point (10) achieves high convergence (low GD value) but low diversity (high IGD value). Note, that the curves are an aggregate of the trade-off curves for all the software systems. 
-From the figure~\ref{fig:param_tuning_multiconfig} we observe that: The number of initial samples (\textit{size} in Figure~\ref{fig:flash_frame}) determines the diversity of the solution. With ten initial samples the algorithm converges (lowest GD values) but lowest diversity (high IGD values). However, with  50 initial samples (random sampling) \flash achieves highest diversity (low IGD values) but lowest convergence (high GD values). We choose the starting size of 30 because it achieves a good trade-off between convergence and diversity. These values were used in the experiments in section~\ref{sec:mo_results}.
-
-\subsection{Can rules learned by CART  guide the search?}
-Currently, \flash does not explicitly reflect on the Decision Tree to select the next sample (or configuration). But, rules learned by Decision Tree can be used to guide the process of search. Though we have not tested this approach, a Decision Tree can be used to learn about importance of various configuration options which can be then used to recursively prune the configuration space, similar to the approach of Oh et al.~\cite{oh2017finding}. We hypothesize that this would make \flash more scalable and be used to much larger models. We leave this for future work. 
-
-\subsection{What are the shortcomings of \flash?}  
-\flash  suffers from the following shortcomings.
-\begin{itemize}[leftmargin=*]
-    \item \textbf{Parallelization}:  \flash like all sequential model-based approaches completes evaluating a configuration before evaluating a new one. However, in practice, this feature can lead to really long runtimes. A possible extension might be to evaluate multiple configurations in parallel. This has not been considered in this version of \flash and is something we leave for the future work.
+\begin{figure}[htbp!]
+{\scriptsize
+    \begin{minipage}[]{\linewidth}
+    \textbf{{\sc Sac}}\\[0.05cm] 
+    \resizebox{\linewidth}{!}{% 
+    \begin{tabular}{|llrrc|}
+    \arrayrulecolor{lightgray}
+    \rowcolor{lightgray}{\small \textbf{Rank}} & {\small\textbf{Learner}} & {\small \textbf{Median}} & {\small\textbf{IQR}} & \\\hline  
+    \rowcolor{lightergray}  1 &       Jamshidi et al.~\cite{jamshidi2017transfer} &    1.58  &  5.39 & \quart{0}{4}{0}{0} \\\hline
+      2 &     BEETLE &    6.89  &  99.1 & \quart{0}{79}{5}{0} \\
+      2 &     Valov et al.~\cite{valov2017transferring} &    6.99  &  99.24 & \quart{0}{79}{6}{0} \\
+    \hline \end{tabular}}\\[0.01cm]
+    \textbf{{\sc Spear}}\\[0.05cm]
+    \resizebox{\linewidth}{!}{%
+    \begin{tabular}{|llrrc|}
+    \arrayrulecolor{lightgray}
+    \rowcolor{lightgray}{\small \textbf{Rank}} & {\small\textbf{Learner}} & {\small \textbf{Median}} & {\small\textbf{IQR}} & \\\hline  
+    \rowcolor{lightergray}  1 &       Jamshidi et al.~\cite{jamshidi2017transfer} &    0.70  &  1.29 & \quart{0}{0}{3}{0}\\
+    \rowcolor{lightergray}1 &     BEETLE &    0.79  &  1.40 & \quart{0}{0}{3}{0} \\
+    \rowcolor{lightergray}1 &     Valov et al.~\cite{valov2017transferring} &    1.11  &  1.98 & \quart{0}{2}{4}{0} \\
+    \hline\end{tabular}}\\[0.01cm]
+    \textbf{{\sc SQLite}}\\[0.05cm]
+    \resizebox{\linewidth}{!}{%%
+    \begin{tabular}{|llrrc|}
+    \arrayrulecolor{lightgray}
+    \rowcolor{lightgray}{\small \textbf{Rank}} & {\small\textbf{Learner}} & {\small \textbf{Median}} & {\small\textbf{IQR}} & \\\hline  
+    \rowcolor{lightergray}  1 &     BEETLE &    5.41  &  9.28 & \quart{2}{10}{5}{0} \\\hline
+      2 &     Valov et al.~\cite{valov2017transferring} &    6.96  &  12.91 & \quart{3}{15}{6}{0} \\
+      3 &     Jamshidi et al.~\cite{jamshidi2017transfer}   &    18.51  &  50.85 & \quart{2}{50}{18}{0} \\
+    \hline \end{tabular}}\\[0.01cm]
+    \textbf{{\sc Storm}}\\[0.05cm]
+    \resizebox{\linewidth}{!}{%
+    \begin{tabular}{|llrrc|}
     
-    \item  \textbf{Non-stationary}: \flash assumes that the benchmark or the load in the system is stationary. Hence, there is no inherent mechanism in \flash which would adapt itself based on the change in workload. This non-stationary nature of the problem is a significant assumption and currently not addressed in this paper. Addressing this aspect may include an ensemble-based approach where a new model is built at a specified time interval. The importance of the model is defined by a time-dependent weight decay of the model, that is, older the model, the lower its significance (weight).
-    
-    \item \textbf{Cost Sensitivity}: \flash also assumes that the cost of evaluating all the configurations are same. However, in practice, this is not true. For example, the wall clock time of running a specific benchmark on a software system with and without caching can be substantially different. In practice, stakeholders may demand to find a good configuration within a specified time limit (instead of the number of configurations measured). We leave this for future work.
-    
-    \item \textbf{Cold Start}: \flash randomly selects the initial configurations to evaluate, which can affect its effectiveness. One of the way to reduce the impact of randomness its to select the initial points based on domain knowledge or use transfer learning from similar software systems that have been optimized in the past, to select the initial configurations of \flash.
-\end{itemize} 
+    \arrayrulecolor{lightgray}
+    \rowcolor{lightgray}{\small \textbf{Rank}} & {\small\textbf{Learner}} & {\small \textbf{Median}} & {\small\textbf{IQR}} & \\\hline  
+    \rowcolor{lightergray}    1 &     BEETLE &    0.04  &  0.06 & \quart{0}{0}{0}{0} \\\hline
+      1 &       Jamshidi et al.~\cite{jamshidi2017transfer} &    0.86  &  20.69 & \quart{0}{21}{1}{0} \\
+      2 &     Valov et al.~\cite{valov2017transferring} &    2.47  &  53.98 & \quart{0}{54}{4}{0} \\
+    \hline \end{tabular}}\\[0.01cm]
+    \textbf{{\sc x264}}\\[0.05cm]
+    \resizebox{\linewidth}{!}{%
+    \begin{tabular}{|llrrc|}
+    \arrayrulecolor{lightgray}
+    \rowcolor{lightgray}{\small \textbf{Rank}} & {\small\textbf{Learner}} & {\small \textbf{Median}} & {\small\textbf{IQR}} & \\\hline  
+    \rowcolor{lightergray}  1 &     BEETLE &    8.67  &  27.01 & \quart{2}{31}{8}{0} \\\hline
+      2 &     Valov et al.~\cite{valov2017transferring} &    16.99  &  41.24 & \quart{5}{47}{17}{0} \\
+      3 &       Jamshidi et al.~\cite{jamshidi2017transfer} &    43.58  &  28.39 & \quart{34}{48}{44}{0} \\
+    \hline \end{tabular}}
+    \end{minipage}}
+    \caption{{\small Comparison between state-of-the-art transfer learners and BEETLE. The best transfer learner is shaded \colorbox{lightergray}{gray}.
+     The ``ranks'' shown in the left-hand-side column come from the statistical analysis described in \tion{stats}.}}
+    \label{fig:rq4}
+    \end{figure}
+
+
+\begin{figure}[]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/Measurements.png}
+    \caption{{\small BEETLE v/s  state-of-the-art transfer learners. The numbers in parenthesis represent the numbers of measurements BEETLE uses in comparison to the  state-of-the-art learners.}}
+    \label{fig:rq4_measurement}
+\end{figure}
 
 
 \section{Threats to Validity}
-{\em Reliability} refers to the consistency of the results obtained
-from the research.  For example,   how well can independent researchers reproduce the study? To increase external
-reliability, we took care to either  define our
-algorithms or use implementations from the public domain
-(SciKitLearn)~\cite{scikit-learn}. All code used in this work are available
-online~\footnote{\url{http://tiny.cc/flashrepo/}}.
+\label{sect:threats}
+% \noindent{\em Reliability}:  care to either clearly define our
+% algorithms or use implementations from the public domain
+% (scikit-learn)~\cite{scikit-learn}. Also, all data and code used in this work are available on-line (\url{https://github.com/blinded4review}).
 
-{\em Validity} refers to the extent to which a piece of research
-investigates what the researcher purports to investigate~\cite{SSA15}.
-{\em Internal validity} concerns with whether the differences found in
-the treatments can be ascribed to the treatments under study. 
+\noindent{\em External validity}: We selected a diverse set of subject systems and a large number of environment changes, but, as usual, one has to be careful when generalizing to other subject systems and environment changes. Even though we tried to run our experiment on a variety of software systems from different domains, we cannot generalize our results beyond these software systems.
 
-For the case-studies relating to configuration control, we cannot measure all possible configurations in a reasonable time. Hence, we sampled only a few hundred configurations to compare the prediction to actual values. We are aware that this evaluation leaves room for outliers and that \textit{measurement bias} can cause false interpretations~\cite{me12d}. We also limit our attention to predicting PF for a given workload; we did not vary benchmarks.
+% We performed experiments with more environmental changes and with additional measurements on the same subject systems (e.g., for SaC we also measured the time it takes to compile the program not only its execution), but we excluded those results because they were consistent with the presented data and did not provide additional insights. Even though we tried to run our experiment on a variety of software systems from different domains, we cannot generalize beyond these software systems. 
 
-\textit{Internal bias} originates from the stochastic nature of multi-objective optimization algorithms. The evolutionary process required many
-random operations, same as the \flash was introduced in this article.
-To mitigate these threats, we repeated our experiments for 20 runs
-and reported the median of the indicators. We also employed
-statistical tests to check the significance of the achieved results.
+\noindent{\em Internal validity}: Due to the size of configuration spaces, we could only measure configurations exhaustively in one subject system (SPEAR) and had to rely on sampling (with substantial sampling size) for the others, which may miss effects in parts of the configuration space that we did not sample. We did not encounter any surprisingly different observation in our exhaustively measured {\sc SPEAR} dataset. Also, all other existing performance optimization work suffer from this threat.
+Measurement noise in benchmarks can be reduced but not avoided. We performed benchmarks on dedicated systems and repeated each measurement three times. We repeated experiments when we encountered unusually large deviations.
 
-It is challenging to find the representatives sample test cases to covers all kinds of software systems. We just selected six most
-common types of software system to discuss the \flash basing on
-them. In the future, we also need to explore more types of SBSE
-problems for other domains such as process planning, next release planning. We aimed to increase {\em external validity} by choosing case-studies from different domains. 
+\noindent{\em Parameter bias}: With all the transfer learners and predictors discussed here, there
+are a number of internal parameters that have been set based on our engineering judgment. The result of changing these parameters may (or may not) have a significant impact on the outcomes of this study. To study the effect of these hyperparameters, we plot the trade-off between the hyperparameters (budget, lives) and NAR values (effectiveness) (see~\fig{tuning}). We note that the performance is correlated to the budget and number of lives, i.e., as the budget increases the NAR value decreases.
+
+
+    
+\section{Discussion}
+\label{sect:disc}
+
+\noindent\textbf{What is the effect of BEETLE on the day to day business of a software engineer?}
+From an industrial perspective, 
+BEETLE can be used in at least the following ways:
+\begin{itemize}[leftmargin=*]
+\item
+Consider an organization which has to optimize their software system for different clients (who have different workload and hardware---different AWS subscriptions). While onboarding new clients, the company might not be able to afford to invest extensive resources in finding the near-optimal configuration to appease the client. State-of-the-art transfer learning techniques would expect the organization to provide a source workload (or environment) for this task. But without a  subject matter expert (SME) with the relevant knowledge, it is hard for humans to select a suitable source. \textit{BEETLE removes the need for such SMEs since it automates \underline{source selection}, along with transferring knowledge between the source and the target environment}.
+\item
+Consider an organization, which needs to migrate all their workload from a legacy platform to a different cloud platform (e.g., AWS to AZURE or vice versa). Such an organization now has many workloads that they need to optimize; however, they lack experience and performance measurements, on the new platform to accomplish this goal. \textit{In such cases, BEETLE provides a way to discover an ideal \underline{source} to transfer knowledge to enable efficient migration of workloads}. 
+\end{itemize}
+
+% \subsection{Does the (source) dataset matter?}
+
+% \subsection{Does sample size of the bellwether dataset matter?}
+
+% \subsection{Tradeoff between sample size (of bellwether) vs. ME?}
+
+% For example, when we set the budget to 4\% of the total configuration space and lives = 4, we find the median NAR values found across all the subject system is 1.8.  We notice that as the budget increases the NAR values decreases and converges when the budget is 10\%. Note, this curve is an aggregate of the trade-off curves of all the software systems discussed in this paper. Since
+% our objective is to minimize the number of measurements while reducing overall NAR, we assign the value of 5 to lives and 10\% to budget for our experiments.
+
+% \noindent\textbf{When (not) to use bellwethers?}
+% How to avoid negative transfer,in transfer learning, is an important open issue that is attracting much attention~\cite{gui2018negative, rosenstein2005transfer}. Negative transfer arises due to several factors such as incorrect source, noise in measurements, incorrect configuration options. In this work, bellwether effect can help overcome negative transfer caused due to incorrect source selection. However, this is not a comprehensive solution to address negative transfer in general. For other issues, just using bellwethers may not be adequate. 
+
+% A point of caution: bellwether for a specific performance measure (such as latency) does not necessarily mean that it would be the bellwether for a different performance measure (such as throughput). During our experiments, we found that bellwether for latency does not work while optimizing throughput for {\sc Storm}. The reason for this is currently unknown and needs more exploration.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.98\linewidth, height=4cm]{figures/ParamTuning.jpg}
+    \caption{The trade-off between the budget of the search, the number of lives, and the NAR (quality) of the solutions.}
+    \label{fig:tuning}
+\end{figure}
+
+
+\noindent\textbf{Is BEETLE applicable in other domains?} In principle, yes. BEETLE could be applied to any transfer learning application, where the choice of the source data impacts the performance of transfer learning. This can be applied to problems such as configuring big data systems~\cite{JC:MASCOTS16}, finding suitable cloud configuration for a workload~\cite{Hsu2018scout, hsu2017low}, 
+configuring hyperparameters of machine learning algorithms~\cite{fu2016tuning, fu2016differential, afridi2018}, runtime adaptation of robotic systems~\cite{jamshidi2017transfer}. In these applications, the correct choice of source datasets using bellwethers can help to reduce the amount of time it takes to discover a near-optimal configuration setting.
+
+\noindent\textbf{Can BEETLE identify bellwethers in completely dissimilar environments?}
+In theory, yes. Given a software system, BEETLE currently looks for an environment which can be used to find a near-optimal configuration for a majority of other environments for \textit{that} software system. Therefore, given performance measurements in a variety of environments, BEETLE can assist in discovering a suitable environment to transfer knowledge from. Our work shows that knowledge can be transferred between environments comprised of completely different hardware, software versions, and workloads.
+
+\noindent\textbf{When are bellwethers ineffective?}
+The existence of bellwethers depends on the following: 
+\bi
+\item
+\textit{Metrics used:} Finding bellwether using metrics that are not justifiable, may be unsuccessful, for example, discovering bellwethers in performance optimization, by measuring MMRE instead of NAR may fail (see \url{http://tiny.cc/bw_metrics})~\cite{nair2017using}.
+\item
+\textit{Different Software System:} Bellwethers of a certain software system `A' may not work for software system `B.' In other words, it cannot be used for heterogeneous transfer learning.
+\item
+ \textit{Different Performance Measures: } Bellwether discovered for one performance measure (time) may not work for other performance measures (throughput).
+\ei
+
+\section{Related Work}
+\label{sect:related}
+
+% Performance optimization, also known as hyperparameter optimization, have gained attention due to ever increasing of highly-configurable systems~\cite{fu2016tuning, fu2016differential, tantithamthavorn2018impact}. %The significant portion of work in the machine learning domains namely Google Vizer~\cite{golovin2017google} (and in performance optimization~\cite{jamshidi2017transfer2, valov2017transferring}).
+
+\noindent\textbf{Performance Optimization: }Modern software systems come with a large number of configuration options. 
+For example, in {\sc Apache} (a popular web server) there are around 600 
+different configuration options and in {\sc hadoop}, as of version 2.0.0, there are around 150 different configuration options, and the number of options is constantly growing~\cite{xu2015hey}. These configuration options control the 
+internal 
+properties of the system such as memory and response times. Given the large number of configurations, it becomes increasingly difficult to assess the impact of the configuration options on the system's performance. To address this issue, a common practice is to employ performance prediction models to estimate the performance of the system under these 
+configurations~\cite{guo2013variability, hoste2006, hutter2014, thereska2010, 
+valov2015, westermann12}. To leverage the full benefit of a software system and its features, researchers augment performance prediction models to enable
+\textit{performance 
+optimization}~\cite{nair2017using,oh2017finding}.
+%Performance optimization 
+%extends performance prediction by identifying the best set of configuration 
+%options to accomplish a given task \textit{with near-optimal 
+%performance}. 
+
+Performance optimization is an important challenge in software engineering. As shown in the next few paragraphs, this problem has attracted much recent research interest. Approaches 
+that use meta-heuristic 
+search algorithms to explore the configuration space of Hadoop for high-performing configurations have been proposed~\cite{tang2018searching}. 
+It has been reported that such meta-heuristic search can find configurations options that perform significantly better than baseline default configurations. 
+In other work, a
+control-theoretic framework called \textit{SmartConf} to automatically set and 
+dynamically adjust performance-sensitive configurations to optimize 
+configuration options~\cite{wang2018understanding}. For the specific case of 
+deep learning clusters, a job scheduler called 
+\textit{Optimus} has been developed to determine
+configuration options that optimize training speed and resource 
+allocations~\cite{peng2018optimus}. Performance optimization has also been extensively explored in other domains 
+such as Systems Research~\cite{zhu2017bestconfig, li2018understanding} 
+and Cloud Computing~\cite{alipourfard2017cherrypick, yadwadkar2017selecting, 
+hsu2017low, Hsu2018scout, hsu2018micky}.
+
+Much of the performance optimization tasks introduced above require access to measurements of the software system under various configuration settings. 
+However, obtaining these performance measurements can cost a significant amount
+of time and money. For example, in one of the software systems studied here ({\sc x264}), it takes over 1536 hours to obtain performance measurements for 11 out the 16 possible configuration options ~\cite{valov2017transferring}. This is in addition to other time-consuming tasks involved in commissioning these systems such as setup, 
+tear down, etc. Further, making performance measurements can cost an exorbitant amount of money. In our case, for {\sc x264}, obtaining
+performance measurements of 2048 configurations under different 
+environments on Amazon AWS \texttt{c4.large} cluster cost us several thousand 
+dollars.
+
+\noindent\textbf{Transfer Learning: }
+When a software system is deployed in a new environment, not every user can 
+afford to repeat the costly process of building a new performance model to find 
+an optimum configuration for that new environment. Instead, researchers propose 
+the use of  transfer learning to 
+reuse the measurements made for previous 
+environments~\cite{valov2017transferring, jamshidi2017transfer, 
+chen2011experience,golovin2017google}.
+Jamshidi et al.~\cite{jamshidi2017transfer}, conducted a preliminary exploratory study of transfer learning in performance optimization to identify transferable knowledge between a source and a target environment, ranging from easily exploitable relationships to more subtle ones. 
+They demonstrated that information about influential configuration options could 
+be exploited in transfer learning and that knowledge about performance
+behavior can be transferred between environments.
+
+Following this, a number of transfer learning methods were developed to predict 
+for the optimum configurations in a new \textit{target} environment, using the 
+performance measures of another \textit{source} environment as a proxy. Several 
+researchers have shown that transfer 
+learning can decrease the cost of learning 
+significantly~\cite{jamshidi2017transfer2,    valov2017transferring, 
+jamshidi2017transfer,chen2011experience}.
+
+All transfer learning methods place implicit faith in the quality of the source. A poor source can significantly deteriorate the performance of transfer learners. 
+
+
+\noindent\textbf{Source Selection with Bellwethers: }
+It is advised that the source used for transfer learning must be chosen with care to ensure optimum performance~\cite{yosinski2014transferable, 
+long2015, afridi2018}. An incorrect choice of the source may result in the all too 
+common \textit{negative transfer} 
+phenomenon~\cite{afridi2018, ben2003, rosenstein2005,pan2010}. A negative transfer can be particularly damaging in that it often leads to performance 
+degradation~\cite{jamshidi2017transfer2, afridi2018}. 
+A preferred way to avoid negative transfer is with \textit{source 
+selection}. Many methods have been proposed for identifying a suitable source for transfer learning~\cite{krishna18, krishna16, afridi2018}. Of these, source
+selection using the bellwether effect is one of the simplest. It has been effective in several diverse domains of software engineering such as defect prediction, effort estimation, and code-smell detection~\cite{krishna18, 
+mensah17a, 
+mensah17b}. 
+
+Besides negative transfer, previous approaches suffer from lack of scalability. For example, Google Visor~\cite{golovin2017google} Jamshidi et al.~\cite{jamshidi2017transfer} rely on a Gaussian process which known to   not scaling to large amounts of data in high dimensional spaces~\cite{rasmussen2004gaussian}
+% \noindent\textbf{Negative Transfer.} The techniques proposed in the prior work implicitly assumes that the user would provide a good source to transfer knowledge. However, this is not always true, and an incorrect source can lead to Negative Transfer and hence return a sub-optimal configuration.
+Accordingly, in this work, we introduce the notion of source selection with bellwether effect for transfer learning in performance optimization. With this, 
+we develop a Bellwether Transfer Learner called BEETLE. We show that, for performance optimization, BEETLE can outperform both non-transfer and the transfer learning methods.    
+
+
 
 \section{Conclusion}
+\label{sect:conclusion}
+Our approach exploits the bellwether effect---there are one or more bellwether environments which can be used to find good configurations for the rest of the environments. We also propose a new transfer learning method, called BEETLE, which exploits this phenomenon. As shown in this paper,  BEETLE can quickly identify the bellwether environments with only a few measurements ($\approx10\%$) and use it to find the near-optimal solutions in the target environments. Further, after extensive experiments with five highly configurable systems demonstrating, we show that  BEETLE:
+\bi
+\item Identifies   suitable sources to construct transfer learners;
+\item Finds near-optimal configurations with only a small number of measurements ( $\le13.5\%\approx \frac{1}{7}^{th}$ of configuration space);
+\item 
+Performs as well as non-transfer learning approaches; and 
+\item
+Performs as well as state-of-the-art transfer learners.
+\ei
+Based on our experiments, we prove our initial hypothesis that: "whence to learn?" is an important question to answer and BEETLE can help answer this question effectively.
 
-This article proposes a sequential model-based method called \flash, an approach for finding better configurations while minimizing the number of measurements. To the best of our knowledge, this is the first time a sequential model-based method is used to solve the problem of performance configuration optimization. \flash sequentially gains knowledge about the configuration space like traditional SMBO. \flash is different from the traditional SMBOs because of the choice of the surrogate model (CART) and the acquisition function (the stochastic Maximum-Mean {\em Bazza} function). We have demonstrated the effectiveness of \flash on single-objective and multi-objective problems using 30 scenarios from 7 software systems.
+% We hence strongly endorse BEETLE for automatically configuring
+% software when there exists numerous other variants of usage  executing
+% in the target environment.
+%As to future work, the findings of this paper allow for using
 
-For a single-objective setting, we experimentally demonstrate that \flash can locate the better configuration of 30 different scenarios for seven software systems, accurately compared to the state-of-the-art approaches while removing the need for a holdout dataset, hence saving measurement costs. In 57\% of the scenarios, \flash can find the better configuration by using an order of magnitude fewer solutions than other state-of-the-art approaches. 
-
-
-For multi-objective setting, we show how \flash can overcome the shortcomings of traditional SMBO (ePAL) while being as effective as ePAL as well as being scalable to software systems with higher number (greater than 10) of configuration options (where ePAL does not terminate in a reasonable time-frame).
-
-% By reflecting on our experiences with \flash, we urge the SE community to embrace the benefits from learning from different communities which solve similar problems. We show that learning from domains like Software Analytics, Machine Learning, and EA; we built \flash -- a hybrid algorithm which is \textit{fast} in terms of evaluation, \textit{scalable} when compared to Bayesian optimization and as \textit{effective} as state of the art methods.  
-
-Regarding future work, the two directions for this research are i) test on different case studies and ii) further improve the scalability of \flash. To conclude, we urge the SE community to learn from communities which tackle similar problems. This article experiments with ideas from fields of machine learning, SBSE, and software analytics to create \flash, which is a fast, scalable and effective optimizer. We hope this article inspires other researchers to look further afield than their home discipline.
-
-\section{Acknowledgement}
-Apel\textquotesingle s work has been supported by the German Research Foundation (AP 206/6, AP 206/7, and AP 206/11). Siegmund\textquotesingle s work is supported by the DFG under the contracts SI 2171/2 and SI 2171/3-1.
-
-
-
-% \balance
-\bibliographystyle{unsrt}
-\bibliographystyle{abbrv}
-
-% \bibliographystyle{ACM-ReferWhy ence-Format}
-\bibliography{main}
-
-% \bibliographystyle{plain}
-% \bibliography{main}
-% \balance
-\vspace{2mm}
+% \section*{ACKNOWLEDGEMENTS}
+%  The work is partially funded by blinded for review. %by an NSF award \#1302169.
 
 
-
-\begin{IEEEbiography}[{\includegraphics[width=1.0in,clip]{Photos/vivek_nair.png}}]
-{Vivek Nair} is a fifth year Ph.D. student in department of Computer Science at North Carolina State University. He received his bachelor and master degree in West Bengal University of Technology and National Institute of Technology, Durgapur respectively. His primary interest lies in the exploring possibilities of using multi-objective optimization to solve problems in Software Engineering. He is currently working on performance prediction models of highly configurable systems. He received his master degree 
-and worked in the mobile industry for a period of 2 years before returning to graduate school. 
-% For more information, visit \url{http://vivekaxl.com}.
-\end{IEEEbiography}
-
-\begin{IEEEbiography}[{\includegraphics[width=1.0in,clip]{Photos/zhe_yu.jpg}}]
- {Zhe Yu} is a third year Ph.D. student in  omputer Science at North Carolina State University. He received his masters degree in Shanghai Jiao Tong University, China. His primary interest lies in the collaboration of human and machine learning algorithms that leads to better performance and higher efficiency. http://azhe825.github.io/
-\end{IEEEbiography}
-
-\begin{IEEEbiography}[{\includegraphics[width=1.0in,  clip]{Photos/tim_menzies.jpg}}]
-{Tim Menzies} (Ph.D., UNSW, 1995) is a full Professor in CS at North Carolina State University, where he explores SE, data mining, AI, search-based SE, and open access science. He is the author of over 250 referred publications and co-founder of the PROMISE conference series devoted to reproducible experiments in SE (\url{http://tiny.cc/seacraft}).  Dr. Menzies also serves as associated editor of many journals:  IEEE Transactions on Software Engineering (2010 to 2016), ACM Transactions on Software Engineering Methodologies, Empirical Software Engineering, the Automated Software Engineering Journal the Big Data Journal, Information Software Technology, IEEE Software, and the Software Quality Journal. He has served as co-general chair of ICSME'16 and  co-PC chair for ASE'12,  ICSE'15, SSBSE'17. For more, see \url{http://menzies.us}.
-\end{IEEEbiography}
-
-
-\begin{IEEEbiography}[{\includegraphics[width=1.0in,clip]{Photos/norbert_siegmund.png}}]
-{Prof. Dr. Norbert Siegmund} holds the Chair of Intelligent Software Systems at the Bauhaus-University Weimar. He received his Ph.D. with distinction in 2012 from the Otto-von-Guericke University Magdeburg. His research thrives to automate software engineering by combining methods from software analysis, machine learning, and meta-heuristic optimization. His special interests include software product lines and configurable software systems, performance and energy optimization, and digitization based on MicroServices and Web technologies. His work has received several awards, such as the ACM SIGSOFT Distinguished Paper Award at the International Software Engineering Conference (ICSE), the best paper award at the Software Product Line Conference (SPLC), and the award of the Karin-Witte Foundation. He is founding member of the Java User Group Thuringia.
-\end{IEEEbiography}
-
-
-\begin{IEEEbiography}[{\includegraphics[width=1.0in,clip]{Photos/sven_apel.png}}]
-{Sven Apel} holds the Chair of Software Engineering at the University of Passau, Germany. The chair is funded by the esteemed Emmy Noether and Heisenberg Programs of the German Research Foundation (DFG). Prof. Apel received his Ph.D. in Computer Science in 2007 from the University of Magdeburg, Germany. His research interests include software product
-lines, software analysis, optimization, and evolution, as well as
-empirical methods and the human factor in software engineering.
-\end{IEEEbiography}
-
+\bibliographystyle{IEEEtran}
+\balance
+\bibliography{bibliography} 
 \end{document}
 
