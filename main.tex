@@ -52,6 +52,10 @@ shadow=false
 \usepackage{array}
 \usepackage{makecell}
 
+\newcommand{\tion}[1]{\S\ref{sect:#1}}
+\newcommand{\fig}[1]{Fig.~\ref{fig:#1}}
+\newcommand{\tab}[1]{Tab.~\ref{tab:#1}}
+
 \definecolor{comment_color}{rgb}{0.5, 0, 1}
 \renewcommand\theadalign{cb}
 \renewcommand\theadfont{\bfseries}
@@ -68,14 +72,7 @@ shadow=false
 \newcommand{\todoorange}[1]{\todoc{cyan}{\textbf{[[#1]]}}}
 \newcommand{\todored}[1]{\todoc{red}{\textbf{[[#1]]}}}
 
-\newcommand{\jc}[1]{\todobrown{JC: #1}}
-\newcommand{\sung}[1]{\todoblue{Sung: #1}}
-\newcommand{\wei}[1]{\todored{Wei: #1}}
-\newcommand{\tim}[1]{\todoblue{Tim: #1}}
-\newcommand{\lin}[1]{\todoorange{Lin: #1}}
 
-
-\newcommand{\fig}[1]{Figure~\ref{fig:#1}}
 \newcommand{\bi}{\begin{itemize}}
 \newcommand{\ei}{\end{itemize}}
 % Set letter paper size:
@@ -127,6 +124,10 @@ fontsize=\small,
 numbers=left
 }
 
+\newcommand{\be}{\begin{enumerate}}
+\newcommand{\ee}{\end{enumerate}}
+\newcommand{\eq}[1]{Equation~\ref{eq:#1}}
+
 %%% graph
 \newcommand{\crule}[3][darkgray]{\textcolor{#1}{\rule{#2}{#3}}}
 %\newcommand{\rone}{\crule{1mm}{1.95mm}}
@@ -154,7 +155,7 @@ numbers=left
   line width = \baselineskip,
 ]
 
-
+\usepackage{wrapfig}
 \newcounter{highlight}[page]
 \newcommand{\tikzhighlightanchor}[1]{\ensuremath{\vcenter{\hbox{\tikz[remember picture, overlay]{\coordinate (#1 highlight \arabic{highlight});}}}}}
 \newcommand{\bh}[0]{\stepcounter{highlight}\tikzhighlightanchor{begin}}
