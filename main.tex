@@ -123,6 +123,9 @@ shadow=false
 fontsize=\small,
 numbers=left
 }
+\definecolor{pink}{rgb}{0.94,0.2,0.3}
+\definecolor{lightgray}{rgb}{0.85, 0.85, 0.85}
+\definecolor{lightergray}{rgb}{0.94, 0.94, 0.94}
 
 \newcommand{\be}{\begin{enumerate}}
 \newcommand{\ee}{\end{enumerate}}
@@ -254,8 +257,7 @@ numbers=left
 % Linebreaks \\ can be used within to get better formatting as desired.
 % Do not put math or special symbols in the title.
 %\title{Overcoming Limits to \\Transfer Learning in Defect Prediction}
-\title{Whence to Learn?
-Transferring Knowledge\\ in Configurable Systems using BEETLE}
+\title{Hints to find good configurations using BEETLE}
 
 \author{Vivek Nair,~%~\IEEEmembership{Member,~IEEE,}
         Rahul Krishna,~%~\IEEEmembership{Member,~IEEE,}
@@ -375,7 +377,7 @@ From a formal perspective, the BEETLE is similar to a  {\bf racing algorithm}
 that sequentially evaluates candidates and discard poor ones as soon as statistically sufficient evidence is found (this elimination of inferior candidates leads to better conclusions~\cite{birattari2002racing}).
 For more details on how BEETLE implements its racing algorithm, see \tion{beetle}.
 
-This work  makes the  following research contributions: 
+\noindent \textbf{Contributions:} This work  makes the  following research contributions: 
 \begin{enumerate}[leftmargin=*]
 \item \textit{Source selection}: We show that the \textit{bellwether effect} exists in performance optimization and that we can use this to discover suitable sources (called bellwether environments) to perform transfer learning. (\S\ref{subsec:rq1})
 \item \textit{Fast source selection algorithm:} We develop a fast algorithm for discovering the bellwether environment by evaluating at-most $\approx10\%$ of the measured configuration space (\S\ref{sect:beetle}).
@@ -390,6 +392,45 @@ methods~\cite{valov2017transferring, jamshidi2017transfer} (\S\ref{subsec:rq4}).
 
 \item \textit{Reproduction Package: } To assist other researchers, a reproduction package with all our scripts and data are available online (see \url{http://tiny.cc/BEETLE}).
 \end{enumerate}
+
+\section{Frequently Asked Questions}
+
+\noindent\textbf{FAQ-1: What is the significance of BEETLE?}
+The article addresses an area much neglected in software engineering: operations and system administration and how these activities is significant in the smooth operations. With the appearance of continuous software engineering and devops, e.g. deployability becomes a software quality to be taken care of by software engineers. System administrators today develop and use programs of the environments, install of environments and software that themselves are programs and try to apply software engineering methods where possible. In this paper, we show how a BEETLE can be used to help the system administrators to optimize their software system to gain operational efficiency.
+
+The article addresses an area much neglected in software engineering: operations and system administration and how these activities relate to software engineering. With the appearance of continuous software engineering and devops, e.g. deployability becomes a software quality to be taken care of by software engineers. System administrators today develop and use programs that environments take care for installation of environments and software that themselves are programs and apply software engineering methods where possible. The article though does not make that connection, and it does not discuss what is needed to apply the algorithm at e.g. a service provider.
+
+\noindent\textbf{FAQ-2: How do system administrators decide on start configurations?}\\
+Typically, off-the-shelf, defaults are used, which often behave poorly. There are various examples presented in the literature which have established that choosing default configuration can lead to sub-optimal performance. Van Aken et al. report that the default MySQL
+configurations in 2016 assume that it will be installed on
+a machine that has 160MB of RAM (which, at that time, was
+incorrect by, at least, an order of magnitude)~\cite{van2017automatic}. Herodotou
+et al. show how standard settings for text mining applications in Hadoop result in worst-case execution times~\cite{herodotou2011starfish}. In
+the same vein, Jamshidi et al. reports for text mining
+applications on Apache Storm, the throughput achieved
+using the worst configuration is 480 times lower than the
+throughput achieved by the best configuration~\cite{JC:MASCOTS16}.
+
+\noindent\textbf{FAQ-3: Do experts  find similar nearly optimal configurations?}\\
+Xu et al. shows humans seldom explore options thoroughly--since the space is voluminous and ever increasing~\cite{xu2015hey}. Also, their choices are sub-optimal, i.e., dependent on workload, hardware, versions, etc., so as they diverge from a specific environment the optimal configuration will change as well~\cite{JC:MASCOTS16, jamshidi2017transfer}.
+
+\noindent\textbf{FAQ-4: What makes bellwethers applicable?}
+
+\noindent Bellwether environment (as explained in Section~\ref{sect:formalization}) represent most informative configurations for understanding the performance of a software system. By training only on a few configuration from the bellwether, we make accurate estimates on the performance of configurations for the other environments.
+
+\noindent \textbf{FAQ-5: Is BEETLE scalable?}\\
+\noindent When assessing the scalability of performance optimization method, we ask primarily try to answer two questions. 
+
+Firstly, is the \textbf{sampling technique} used in the presented method is scalable. There as various methods used in the literature (such as Feature-frequency based sample selection~\cite{sarkar2015cost} and Spectral based sample selection~\cite{nair2017faster, }). However, these strategies are linear time algorithms. Given the progressive sampling nature of the performance optimization the complexity of the sampling techniques are $O(N*Budget)$, where $N$ is the number of valid configuration and $Budget$ is the number of configuration sampled (and evaluated). This is can be very expensive because $N$ could be astronomically large.  Oh et al~\cite{oh2017finding}, have demonstrated the need of have variants of random sampling to make it scalable. Based on Oh et al.'s suggestion, BEETLE uses random sampling as its preferred sampling strategy.
+
+Secondly, is the \textbf{machine learning model} used in the method is scalable. There are various models used in performance optimization such as Gaussian Process~\cite{jamshidi2017transfer}, Regression Trees~\cite{guo2013variability, sarkar2015cost, nair2018finding}, and Bagging, Random Forest, and Support
+Vector Machines (SVMs)~\cite{valov2015empirical}. Recently, Nair et al.~\cite{nair2018finding} showed that Gaussian Processes are not scalable (hence should be avoided) and showed that Regression Trees (such as CART) is scales to larger dataset (in our case, software system). Also, there exists a vast literature on methods to make regression trees scalable~\cite{domingos2000mining}. Hence, regression trees is our machine learning model of choice.
+ 
+ Due to the above reason, BEETLE uses \textit{random sampling} and \textit{regression trees}. Both random sampling as well as regression trees scale to large spaces, as opposed to known scalability issues in state-of-the-art methods introduced by Jamshidi et al.~\cite{jamshidi2017transfer, jamshidi2017transfer2}.  The scalability of BEETLE is demonstrated while finding (near) optimal configurations of SaC, which  has 50 dimensions and $2^{50}$ configurations in 5 environments. But, only 10\% of SAC\_6 is needed to predicting near-optimum configurations (as shown in Figures~\ref{fig:rq1} and~\ref{fig:rq2_1} and Table~\ref{tbl:method}). 
+
+
+
+
 
 
 \section{Definitions and Problem Statement}
@@ -604,7 +645,7 @@ In fact, there have been a lot of criticism regarding MMRE. MMRE along with othe
 Nair et al.~\cite{nair2017using} showed that even when exact MMRE values may be erroneous, the {\em relative rankings} of the  performance scores are still useful . Especially for pruning away less-than-desirable
 configurations~\cite{nair2017using}.    
 
-\input{RQ1.tex}
+\input{tex/RQ1.tex}
 For this reason, Nair et al.~\cite{nair2017using} argued for the use alternatives to MMRE in the performance optimization. Specifically, they propose \textit{rank-based metrics}. Here, the accuracy of a model is measured  by sorting the values of $y=f(x)$ from `small' to `large', that is:
 \begin{equation}
     f(c_1) \le f(c_2) \le f(c_3) \le ... \le f(c_n).
@@ -703,7 +744,7 @@ We used the racing algorithm discussed in Section~\ref{subsec:finding}. To see i
 % \item We repeat the above steps until we cannot eliminate any more environments.
 % \ee
 % The above strategy uses $\mu+\sigma$ of the NAR values at each step as a threshold to eliminate non-bellwether environments. To function correctly, this requires the NAR values to follow a normal distribution. If normality is violated, we used power transforms to make the data more normal distribution-like. We note that this is a common strategy commonly used in other domains to reduce the size of options or alternatives~\cite{borgelt2005keeping} and is also known as \textit{backward elimination}~\cite{blum1997selection}.
-\input{RQ2.tex}
+\input{tex/RQ2.tex}
 \noindent\textbf{\textit{\underline{Result:}}}
 Table~\ref{tbl:method} summarizes our findings. We find that, 
 \begin{itemize}[leftmargin=*]
@@ -888,10 +929,7 @@ Consider an organization, which needs to migrate all their workload from a legac
 % For example, when we set the budget to 4\% of the total configuration space and lives = 4, we find the median NAR values found across all the subject system is 1.8.  We notice that as the budget increases the NAR values decreases and converges when the budget is 10\%. Note, this curve is an aggregate of the trade-off curves of all the software systems discussed in this paper. Since
 % our objective is to minimize the number of measurements while reducing overall NAR, we assign the value of 5 to lives and 10\% to budget for our experiments.
 
-% \noindent\textbf{When (not) to use bellwethers?}
-% How to avoid negative transfer,in transfer learning, is an important open issue that is attracting much attention~\cite{gui2018negative, rosenstein2005transfer}. Negative transfer arises due to several factors such as incorrect source, noise in measurements, incorrect configuration options. In this work, bellwether effect can help overcome negative transfer caused due to incorrect source selection. However, this is not a comprehensive solution to address negative transfer in general. For other issues, just using bellwethers may not be adequate. 
 
-% A point of caution: bellwether for a specific performance measure (such as latency) does not necessarily mean that it would be the bellwether for a different performance measure (such as throughput). During our experiments, we found that bellwether for latency does not work while optimizing throughput for {\sc Storm}. The reason for this is currently unknown and needs more exploration.
 
 \begin{figure}[t]
     \centering
@@ -917,6 +955,11 @@ The existence of bellwethers depends on the following:
 \item
  \textit{Different Performance Measures: } Bellwether discovered for one performance measure (time) may not work for other performance measures (throughput).
 \ei
+
+% \noindent\textbf{When (not) to use bellwethers?}
+% How to avoid negative transfer,in transfer learning, is an important open issue that is attracting much attention~\cite{gui2018negative, rosenstein2005transfer}. Negative transfer arises due to several factors such as incorrect source, noise in measurements, incorrect configuration options. In this work, bellwether effect can help overcome negative transfer caused due to incorrect source selection. However, this is not a comprehensive solution to address negative transfer in general. For other issues, just using bellwethers may not be adequate. 
+
+% A point of caution: bellwether for a specific performance measure (such as latency) does not necessarily mean that it would be the bellwether for a different performance measure (such as throughput). During our experiments, we found that bellwether for latency does not work while optimizing throughput for {\sc Storm}. The reason for this is currently unknown and needs more exploration.
 
 \section{Related Work}
 \label{sect:related}
@@ -1028,6 +1071,6 @@ Based on our experiments, we prove our initial hypothesis that: "whence to learn
 
 \bibliographystyle{IEEEtran}
 \balance
-\bibliography{bibliography} 
+\bibliography{main} 
 \end{document}
 
